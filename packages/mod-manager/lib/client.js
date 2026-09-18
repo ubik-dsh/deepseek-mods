@@ -40,6 +40,7 @@ window.__ModuleLoader__.load({
 			subtitle: "Loader rows in this Harness home and the packages they mount.",
 			home: "Harness home",
 			refresh: "Refresh",
+			updatedAt: "Updated at",
 			loading: "Loading…",
 			empty: "No loader rows in this home yet.",
 			layerMissing: "this layer does not exist yet",
@@ -96,6 +97,7 @@ window.__ModuleLoader__.load({
 			subtitle: "Строки загрузчика в этом домашнем каталоге и пакеты, которые они монтируют.",
 			home: "Домашний каталог",
 			refresh: "Обновить",
+			updatedAt: "Обновлено в",
 			loading: "Загрузка…",
 			empty: "В этом каталоге пока нет строк загрузчика.",
 			layerMissing: "этого слоя ещё нет",
@@ -263,6 +265,8 @@ window.__ModuleLoader__.load({
 		const styles = {
 			wrap: { display: "grid", gap: "14px", fontSize: "13px" },
 			head: { display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "baseline", justifyContent: "space-between" },
+			refreshBox: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" },
+			stamp: { fontSize: "12px", opacity: 0.65, whiteSpace: "nowrap" },
 			title: { margin: 0, fontSize: "15px", fontWeight: 600 },
 			subtitle: { margin: "2px 0 0", opacity: 0.7, fontSize: "12.5px" },
 			home: {
@@ -345,6 +349,10 @@ window.__ModuleLoader__.load({
 			const served = servedNames();
 			const [busy, setBusy] = react.useState(false);
 			const [notice, setNotice] = react.useState(null);
+			// When the last read finished. Without it the button looks dead: the
+			// data is usually unchanged, so a successful refresh and a broken one
+			// are indistinguishable on screen.
+			const [refreshedAt, setRefreshedAt] = react.useState(null);
 			// One open card at a time, the way the shipped plugin inventory behaves.
 			const [expanded, setExpanded] = react.useState(null);
 
@@ -360,6 +368,7 @@ window.__ModuleLoader__.load({
 						return;
 					}
 					setState(body);
+					setRefreshedAt(new Date());
 				}, (error) => {
 					setNotice({ kind: "error", text: t(ERROR_KEYS[String(error?.message)] ?? "errGeneric") });
 				}).finally(() => {
@@ -393,11 +402,17 @@ window.__ModuleLoader__.load({
 				h("div", null,
 					h("h3", { style: styles.title }, t("title")),
 					h("p", { style: styles.subtitle }, t("subtitle"))),
-				h(primitives.Button, {
-					variant: "outline",
-					disabled: busy,
-					onClick: load,
-				}, busy ? t("busy") : t("refresh")));
+				h("div", { style: styles.refreshBox },
+					h(primitives.Button, {
+						variant: "outline",
+						disabled: busy,
+						onClick: load,
+					}, busy ? t("busy") : t("refresh")),
+					// A refresh that changes nothing looks like a dead button, so the
+					// panel states when the read it just did finished.
+					refreshedAt === null
+						? null
+						: h("span", { style: styles.stamp }, `${t("updatedAt")} ${refreshedAt.toLocaleTimeString()}`)));
 
 			const body = [];
 			body.push(h("div", { style: styles.home, key: "home" }, `${t("home")}: ${String(state?.home ?? "…")}`));

@@ -322,6 +322,7 @@ try {
   assert.ok(text.includes('@local/dsh-locale-ru'), 'it lists the installed mod')
   assert.ok(text.includes('profile web'), 'it lists each patch layer')
   assert.ok(text.includes('locale-ru'), 'it shows the row id')
+  assert.ok(text.includes('Обновлено в'), 'and says when it last read, so a refresh cannot look dead')
   console.log('ok  5. renders the mods and layers from the host snapshot')
 
   // 6. every mod is a card in the official format
