@@ -160,23 +160,30 @@ if (UNINSTALL) {
   process.exit(0)
 }
 
-// ── 1. back up the mod state and the packages ──────────────────────────────
+// ── 1. back up what a re-install could otherwise destroy ───────────────────
+//
+// Only a machine that already has these packages has something to preserve. On
+// a first install this step is skipped, so a stranger's clean home does not
+// collect a `mod-backups` copy of what it is installing — and repeated runs do
+// not fill the home with dated snapshots of the same files.
+const target = join(home, 'profiles', 'node_modules', '@local')
+const previous = packages.filter((entry) => existsSync(join(target, entry.directory)))
 const backupDir = join(home, 'mod-backups', new Date().toISOString().replace(/[:.]/gu, '-').slice(0, 19))
-let backupCount = 0
-if (!DRY_RUN) {
+const backedUp = !DRY_RUN && previous.length > 0
+if (backedUp) {
+  mkdirSync(backupDir, { recursive: true })
   for (const file of STATE_FILES) {
     if (!existsSync(file)) continue
-    mkdirSync(backupDir, { recursive: true })
     cpSync(file, join(backupDir, file.split(/[\\/]/u).pop()))
-    backupCount += 1
     say(t.backupState(file))
   }
-  mkdirSync(join(backupDir, 'packages'), { recursive: true })
-  for (const entry of packages) {
-    cpSync(join(PACKAGES_DIR, entry.directory), join(backupDir, 'packages', entry.directory), { recursive: true })
+  for (const entry of previous) {
+    // The installed copy is what the next step overwrites.
+    cpSync(join(target, entry.directory), join(backupDir, 'packages', entry.directory), { recursive: true })
   }
   say(t.backupPackages(join(backupDir, 'packages')))
-  if (backupCount === 0) say(t.backupEmpty)
+} else if (!DRY_RUN) {
+  say(t.backupEmpty)
 }
 
 if (BACKUP_ONLY) {
@@ -185,7 +192,6 @@ if (BACKUP_ONLY) {
 }
 
 // ── 2. install the packages into the profile's node_modules ────────────────
-const target = join(home, 'profiles', 'node_modules', '@local')
 if (!DRY_RUN) mkdirSync(target, { recursive: true })
 for (const entry of packages) {
   const source = join(PACKAGES_DIR, entry.directory)
@@ -239,4 +245,4 @@ if (HOME_LEVEL) ensureRows(join(home, 'cordis.patch.yml'), 'home layer (all prof
 say('')
 if (DRY_RUN) say(t.dryRun)
 say(t.done)
-if (!DRY_RUN) say(t.backupDir(backupDir))
+if (backedUp) say(t.backupDir(backupDir))
