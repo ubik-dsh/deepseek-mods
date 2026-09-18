@@ -37,6 +37,9 @@ jobs:
       - name: Prompt mod browser bundle
         run: node tools/dev/test-client.mjs
 
+      - name: Markdown links and anchors
+        run: node tools/dev/test-links.mjs
+
       - name: Language bundle is reproducible from its sources
         run: |
           node tools/build-locale.mjs
@@ -54,6 +57,20 @@ jobs:
           test -f "$DSH_HOME/profiles/node_modules/@local/locale-ru/lib/client.js" \
             || { echo "package was not installed"; exit 1; }
           node tools/install.mjs --dry-run
+          # Re-running must be a true no-op: it reports the packages as current
+          # and leaves no backup snapshot behind. This is a regression guard —
+          # the first version of the installer claimed this but kept backing up.
+          rm -rf "$DSH_HOME/mod-backups"
+          second=$(node tools/install.mjs --lang en)
+          printf '%s\n' "$second"
+          case "$second" in
+            *"is already up to date"*) ;;
+            *) echo "second install did not report the packages as current"; exit 1 ;;
+          esac
+          if [ -e "$DSH_HOME/mod-backups" ]; then
+            echo "a no-op install created a backup snapshot"
+            exit 1
+          fi
           node tools/install.mjs --uninstall
           grep -q '^\[\]$' "$DSH_HOME/profiles/web/cordis.patch.yml" \
             || { echo "patch file was not restored"; exit 1; }

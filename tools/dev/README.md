@@ -10,6 +10,7 @@ install or use them.
 | `test-host.mjs` | 11 checks on the prompt mod's host half, against the real `renderPrompt` | DSH packages resolvable |
 | `test-client.mjs` | 6 checks on the prompt mod's browser bundle, with stub React and primitives | Node only |
 | `test-locale-ru.mjs` | Verifies the language pack's contract and full key coverage | Node only |
+| `test-links.mjs` | Checks every relative link and `#anchor` in the repository's Markdown | Node only |
 | `link-dsh.mjs` | Links the repository to a DSH installation so `@deepseek-ai/*` resolves for the unit tests | A DSH home |
 | `ui-check.mjs` | Renders the real GUI in headless Edge over CDP, opens a session, clicks the prompt control, screenshots | Windows, Edge, a running `dsh web` |
 | `ui-locale.mjs` | Same harness: opens Settings, switches the language, screenshots | Windows, Edge, a running `dsh web` |
@@ -30,8 +31,18 @@ node tools/dev/test-host.mjs
 ```
 
 The link lands in `node_modules/`, which git ignores. It is not needed for
-`test-client.mjs` or `test-locale-ru.mjs`, and never for installing or using the
-mods.
+`test-client.mjs`, `test-locale-ru.mjs` or `test-links.mjs`, and never for
+installing or using the mods.
+
+### The link check
+
+`test-links.mjs` reads every `.md` file in the repository and fails on a relative
+path that does not exist and on a `#anchor` that no heading produces. It never
+touches the network, so it runs in CI next to the other Node-only checks. It was
+written after a public-facing review pointed out that a reader follows a
+repository through its links; the first version of the checker was itself broken
+by CRLF line endings and reported nine false failures, which is why the file
+carries a comment about it.
 
 ### The browser checks
 
@@ -67,6 +78,7 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 | `test-host.mjs` | 11 проверок host-половины мода промпта на настоящем `renderPrompt` | Пакеты DSH должны резолвиться |
 | `test-client.mjs` | 6 проверок браузерного бандла мода промпта на заглушках React и примитивов | Только Node |
 | `test-locale-ru.mjs` | Проверка контракта языкового пакета и полного покрытия ключей | Только Node |
+| `test-links.mjs` | Проверяет все относительные ссылки и `#якоря` в markdown репозитория | Только Node |
 | `link-dsh.mjs` | Привязывает репозиторий к установке DSH, чтобы юнит-тесты видели `@deepseek-ai/*` | Домашний каталог DSH |
 | `ui-check.mjs` | Отрисовка настоящей GUI в headless Edge по CDP: открыть сессию, нажать кнопку промпта, снять скриншоты | Windows, Edge, запущенный `dsh web` |
 | `ui-locale.mjs` | Тот же стенд: открыть настройки, переключить язык, снять скриншоты | Windows, Edge, запущенный `dsh web` |
@@ -88,8 +100,18 @@ node tools/dev/test-host.mjs
 ```
 
 Ссылка появляется в `node_modules/`, который git игнорирует. Для
-`test-client.mjs` и `test-locale-ru.mjs` она не нужна — как и для установки и
-использования самих модов.
+`test-client.mjs`, `test-locale-ru.mjs` и `test-links.mjs` она не нужна — как и
+для установки и использования самих модов.
+
+### Проверка ссылок
+
+`test-links.mjs` читает все `.md` файлы репозитория и падает, если
+относительный путь не существует или `#якорь` не соответствует ни одному
+заголовку. В сеть он не ходит, поэтому в CI работает рядом с остальными
+проверками, которым нужен только Node. Он появился после ревизии, указавшей,
+что читатель идёт по репозиторию через ссылки; первая версия самого чекера
+ломалась на переводах строк CRLF и выдала девять ложных срабатываний — поэтому
+в файле про это есть комментарий.
 
 ### Браузерные проверки
 

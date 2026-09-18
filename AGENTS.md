@@ -47,6 +47,7 @@ node tools/dev/link-dsh.mjs            # make @deepseek-ai/* resolvable for test
 node tools/dev/test-host.mjs           # prompt mod, host half
 node tools/dev/test-client.mjs         # prompt mod, browser bundle
 node tools/dev/test-locale-ru.mjs      # language pack contract
+node tools/dev/test-links.mjs          # markdown links and anchors
 ```
 
 ## Editing cautions

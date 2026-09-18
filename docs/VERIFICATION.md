@@ -25,6 +25,10 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 11 | Install into a **clean** Harness home, then boot | `node tools/install.mjs` + `dsh web` | both mods in the served boot graph |
 | 12 | Host route on that clean instance | probe | **200**, new host half |
 | 13 | Uninstall on a running instance | `node tools/install.mjs --uninstall` | packages and rows removed; patch restored to `[]`; both rows became **MISS** in the served boot graph **without a restart** |
+| 14 | Re-running the installer writes nothing | `node tools/install.mjs` twice | second run: `is already up to date` ×2, no `mod-backups` directory created |
+| 15 | Markdown links and anchors resolve | `node tools/dev/test-links.mjs` | **PASS** — 16 files, 65 relative links |
+| 16 | No secret in anything published | `node _dsh_mod/public-scan.mjs` | **CLEAN** — 126 tracked names, 154 blobs including unreachable ones, no key or password |
+| 17 | A stranger can read and clone it | `node _dsh_mod/verify-public.mjs` | **PASS** — page `HTTP 200`; anonymous `ls-remote`; anonymous clone with `README.md`, `README.ru.md`, `LICENSE`, both packages |
 
 ## What the run established about DSH itself
 
@@ -43,6 +47,42 @@ Three behaviours, each verified against a running server rather than inferred:
 The first two make installation and removal pleasant; the third is why the
 install runbook tells a user to restart after an upgrade rather than promising a
 hot swap.
+
+## External reviews of the documentation
+
+The install runbook is only as good as what a reader who has never seen this
+repository can do with it. So it was tested that way: fresh AI agents, given
+nothing but the repository path and the words "install these mods", with no
+memory of how the mods were built and no access to the author's machine.
+
+Each round used a scratch `DSH_HOME` and its own server on a free port; the
+reviewers never touched the real Harness home.
+
+| Round | Verdict | Score |
+|---|---|---|
+| 1 | **No** — a stranger would have to ask the author a question | — |
+| 2 | **No** | 6.5 / 10 |
+| 3 | pending | pending |
+
+### What the reviews found, and what changed
+
+| Finding | Resolution |
+|---|---|
+| The runbook told the reader to ask the user to start `dsh web` first, which is impossible when the user is not present | Removed. Installation was re-verified against an empty Harness home, and a first boot was shown to preserve the patch |
+| A never-booted Harness home has no browser-session secret, and boot fails with `cannot read the browser-session secret` | Added as a troubleshooting row |
+| Commands were written for bash in a world where the reader is on Windows | Every example split into PowerShell and POSIX forms |
+| The `dsh` shim (`.ps1`) is blocked by the Windows execution policy | Added as a troubleshooting row **and** made the direct `node lib/bin.js` call the primary fix, with an explicit instruction never to change the execution policy |
+| `boot-check.mjs` was presented as proof of a working mod, though it only proves the roster | Added "what it does not prove" and the route and GUI checks to the runbook |
+| The launch recipe used undocumented flags (`--no-open`, the port argument) | A copy-pasteable, fully documented launch recipe in Step 4 |
+| A character count was quoted as if it were a property of the mod | Removed; it is environment-dependent |
+| Step 3 assumed the Harness home had been booted at least once | Added a note for the never-booted case |
+| `git` was required but absent from Requirements | Added |
+| Development UI scripts wrote screenshots into the repository and used inconsistent ports | Screenshots moved to a temp directory (override with `DSH_SHOTS`), port made a parameter, all documented in `tools/dev/README.md` |
+| Re-running the installer still accumulated backup snapshots, and a code comment claimed otherwise | `treeDigest()` / `sameTree()` compare content digests, so a second run prints `already up to date` and writes nothing — verified as a full install/install/uninstall round trip |
+
+The idempotence finding is worth calling out because it was a real defect in the
+tool, not just in the prose: the first fix removed backups on a *clean* install
+but still snapshotted on every re-run.
 
 ## Not covered
 
