@@ -59,12 +59,10 @@ jobs:
           mkdir -p "$DSH_HOME/profiles/web"
           printf '[]\n' > "$DSH_HOME/profiles/web/cordis.patch.yml"
           node tools/install.mjs --lang en
-          for id in system-prompt-mod locale-ru; do
+          for id in system-prompt-mod locale-ru mod-manager; do
             grep -q "id: $id" "$DSH_HOME/profiles/web/cordis.patch.yml" \
               || { echo "row $id was not added"; exit 1; }
           done
-          test -f "$DSH_HOME/profiles/node_modules/@local/locale-ru/lib/client.js" \
-            || { echo "package was not installed"; exit 1; }
           # The row names `@local/dsh-locale-ru`, and Node resolves that to a
           # directory of the same name — so the copy must land there, not in the
           # repository's folder name. Installing under the folder name left the
@@ -73,6 +71,17 @@ jobs:
           for name in dsh-locale-ru dsh-mod-manager dsh-system-prompt-mod; do
             test -f "$DSH_HOME/profiles/node_modules/@local/$name/package.json" \
               || { echo "$name was not installed under its own package name"; exit 1; }
+            test -f "$DSH_HOME/profiles/node_modules/@local/$name/lib/index.js" \
+              || { echo "$name has no host half"; exit 1; }
+          done
+          test -f "$DSH_HOME/profiles/node_modules/@local/dsh-locale-ru/lib/client.js" \
+            || { echo "the language pack has no browser half"; exit 1; }
+          # Nothing may be left under the repository's folder names, or a future
+          # resolution would silently pick up a stale copy.
+          for stale in locale-ru system-prompt-mod mod-manager; do
+            if [ -e "$DSH_HOME/profiles/node_modules/@local/$stale" ]; then
+              echo "a package was installed under the folder name $stale"; exit 1
+            fi
           done
           node tools/install.mjs --dry-run
           # Re-running must be a true no-op: it reports the packages as current
@@ -95,6 +104,11 @@ jobs:
           if grep -q 'id: ' "$DSH_HOME/profiles/web/cordis.patch.yml"; then
             echo "rows were not removed"; exit 1
           fi
+          for name in dsh-locale-ru dsh-mod-manager dsh-system-prompt-mod; do
+            if [ -e "$DSH_HOME/profiles/node_modules/@local/$name" ]; then
+              echo "uninstall left $name behind"; exit 1
+            fi
+          done
           echo "installer round trip OK"
 
       - name: Clean the scratch home
