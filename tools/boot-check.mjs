@@ -11,6 +11,8 @@
  *   node tools/boot-check.mjs                       # http://127.0.0.1:3080
  *   node tools/boot-check.mjs http://127.0.0.1:3080 dsh-locale-ru
  *
+ * With no names, it checks every mod this repository ships.
+ *
  * @module tools/boot-check
  */
 
@@ -46,7 +48,9 @@ if (response.status !== 200) {
 
 console.log(`GET / -> 200 (${String(html.length)} bytes)`)
 console.log(`boot rows referencing /client.js: ${String((html.match(/\/client\.js/gu) ?? []).length)}`)
-const wanted = names.length > 0 ? names : ['dsh-system-prompt-mod', 'dsh-locale-ru']
+const wanted = names.length > 0
+  ? names
+  : ['dsh-system-prompt-mod', 'dsh-locale-ru', 'dsh-mod-manager']
 let failed = 0
 for (const name of wanted) {
   const present = html.includes(name)

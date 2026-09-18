@@ -29,7 +29,7 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 15 | Markdown links and anchors resolve | `node tools/dev/test-links.mjs` | **PASS** — 16 files, 65 relative links |
 | 16 | No secret in anything published | `node tools/dev/scan-secrets.mjs --git <path>` | **PASS** — 127 tracked names, 162 blobs including unreachable ones, 131 files on disk, no key or password |
 | 17 | A stranger can read and clone it | `node _dsh_mod/verify-public.mjs` | **PASS** — page `HTTP 200`; anonymous `ls-remote`; anonymous clone with `README.md`, `README.ru.md`, `LICENSE`, both packages |
-| 18 | Every live check on the running GUI | `node tools/dev/verify-live.mjs` | **PASS** — 5 of 5: page 28 185 bytes, 168 boot rows, **24 827** Cyrillic characters in the served bundle, route `200` |
+| 18 | Every live check on the running GUI | `node tools/dev/verify-live.mjs` | **PASS** — 6 of 6: page 28 463 bytes, 171 boot rows, **25 783** Cyrillic characters in the served bundle, both host routes `200`, the manager reporting 2 layers and 3 rows |
 | 19 | The secret scanner can fail | planted key on disk, then committed and deleted, then a tracked `.env` | **FAIL** ×3, each on the right finding — including the deleted-but-still-stored blob |
 | 20 | Mod manager, host half | `node tools/dev/test-mod-manager.mjs` | **PASS** — 27 checks: patch parsing, every action, and every refusal |
 | 21 | Mod manager, browser bundle | `node tools/dev/test-mod-manager-client.mjs` | **PASS** — 13 checks on a React stub that honours hook dependencies |
