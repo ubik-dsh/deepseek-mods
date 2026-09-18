@@ -16,31 +16,41 @@ troubleshooting table at the end covers what can go wrong.
 2. **Never restart the user's `dsh web` process without asking.** If you are
    running inside it, restarting ends your own session. Tell the user the exact
    command instead.
-3. **Never commit or print credentials.** `$DSH_HOME/.credentials.yaml` holds
+3. **Starting your own `dsh web` is fine; restarting the user's is not.** To
+   verify an installation, boot a second server on a free port under your own
+   `DSH_HOME` — that never touches theirs, and it is how every check below was
+   validated.
+4. **Never commit or print credentials.** `$DSH_HOME/.credentials.yaml` holds
    API keys and the browser-session signing secret.
-4. **Verify, don't assume.** Every claim below is checkable with a command.
+5. **Verify, don't assume.** Every claim below is checkable with a command.
 
 ## Step 1 — locate the environment
 
+```powershell
+node --version        # must exist; DSH runs on Node
+$env:DSH_HOME         # empty means the default below
+```
+
 ```bash
-node --version                 # must exist; DSH runs on Node
-echo "$DSH_HOME"               # empty means the default below
+node --version        # the bash equivalents
+echo "$DSH_HOME"
 ```
 
 The Harness home is `$DSH_HOME`, or `~/.dsh` (`%USERPROFILE%\.dsh` on Windows)
-when unset. Check it exists:
+when unset. `web` is the browser GUI and the default target.
 
-```bash
-ls "$DSH_HOME/profiles"        # or: dir "%USERPROFILE%\.dsh\profiles"
-```
+**A missing home is not a blocker.** Do *not* interrupt the user to "run
+`dsh web` once first": `tools/install.mjs` creates the directories it needs, and
+the first `dsh web` afterwards materialises the rest of the profile around them
+while leaving the patch file byte-for-byte intact. That was measured on a home
+with nothing in it, not assumed.
 
-You should see one directory per profile. `web` is the browser GUI and the
-default target.
+**Check:** after Step 2, `$DSH_HOME/profiles/web/cordis.patch.yml` exists and
+contains one `- insert:` row per package.
 
-**Check:** the profile directory contains `cordis.patch.yml` and `package.json`.
-
-If the home does not exist, DSH has never run on this machine. Ask the user to
-run `dsh web` once first — a fresh home is created from shipped templates.
+If the `dsh` command itself will not run, go to the troubleshooting table: on
+Windows a blocked PowerShell script is the usual reason, and the table shows how
+to launch the same binary with `node`.
 
 ## Step 2 — install
 
@@ -95,6 +105,17 @@ The probe reads the browser-session secret from the local Harness home, mints
 the same cookie the GUI uses, and reports which client rows the served boot
 graph carries. It prints no secret. Exit code is non-zero when a row is missing.
 
+**What `boot-check` does not prove.** It greps the served page for two package
+names. It does not prove that the prompt mod's host route registered, nor that
+the language pack carries translations. Two cheap extra checks close that gap:
+
+- the route answers when the host half is live:
+  `GET /api/system-prompt.mod` — its full contract is in
+  [the package README](../packages/system-prompt-mod/README.md#http-contract);
+- open a session and click **Промпт** — the dialog lists the current prompt
+  (7041 characters on a fresh install). An error line there means the route
+  answered but the prompt assembly failed, which is a different problem.
+
 Manual equivalent: open the GUI and check that
 
 - a **Промпт / Prompt** control appears in a session header (the mod adds it to
@@ -114,6 +135,9 @@ Tell the user exactly:
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `dsh` is not found at all | DSH was installed through npx and never linked onto `PATH` | find its launcher and call it with node: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web` |
+| `dsh` fails with `…dsh.ps1 cannot be loaded because running scripts is disabled on this system` | PowerShell execution policy blocks the shim on Windows | call `lib/bin.js` with node as above, or allow signed scripts once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `boot-check` prints `cannot read the browser-session secret` | the home has never booted, so it has no `.credentials.yaml` yet | start `dsh web` once against that home, then re-run the probe |
 | `boot-check` prints `cannot reach …` | `dsh web` is not running, or a different port | start it, or pass the right URL |
 | `boot-check` prints `the derived cookie was refused` | wrong Harness home (the secret belongs to another install) | set `DSH_HOME` to the home the running server uses |
 | Rows are in the patch file but a mod is missing from the roster | the page was not reloaded, or the browser half failed to parse | reload; then read the browser console |
