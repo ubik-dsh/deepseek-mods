@@ -29,8 +29,14 @@ with `{{model}}`, `{{cwd}}` and preset layers already resolved.*
 
 ![The Mods tab listing installed mods](docs/screenshots/mods-panel.png)
 
-*The mod manager lists every loader row, whether the page was served it, and what
-can be done with it.*
+*Before: every loader row, whether this page was served it, and what can be done
+with each one.*
+
+![The same tab after turning the prompt mod off](docs/screenshots/mods-turned-off.png)
+
+*After: the prompt mod turned off from this panel. Its row left the patch file,
+its host route stopped answering, the badge reads "off" and the button became
+"turn on" — with no restart. Turning it back on restores the row the same way.*
 
 ---
 
