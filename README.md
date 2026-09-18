@@ -169,6 +169,7 @@ tools/
 docs/
   AI-INSTALL.md        install runbook for an AI agent
   AI-PROMPT.md         prompt + reference for having an AI build a new mod
+  VERIFICATION.md      every check that was run, and what was not covered
   PUBLISH.md           how to publish this repository (GitHub, GitVerse)
 AGENTS.md              what a DSH agent working here should know — loaded automatically
 ```
@@ -190,6 +191,9 @@ This repository is written to be operated by an agent as well as a person:
   client bundle format, the verified APIs, the pitfalls, and the deliverable checklist.
 
 Both documents exist in Russian too: `docs/AI-INSTALL.ru.md`, `docs/AI-PROMPT.ru.md`.
+
+Every check that was run against these mods — and everything that was **not**
+covered — is written down in [`docs/VERIFICATION.md`](docs/VERIFICATION.md).
 
 ## Compatibility
 

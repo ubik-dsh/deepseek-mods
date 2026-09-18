@@ -339,11 +339,14 @@ Then verify, in this order:
 ## Phase 7 — rules learned the hard way
 
 1. **Editing a loaded package does not reload it.** The loader imports a module
-   once per process, keyed by resolved URL, with no cache-busting. A *new* row
-   is applied live; a *changed* package file needs a `dsh web` restart.
-2. **A patch reload does not recreate an existing row.** Changing a row's
-   `name` to a nonexistent specifier left the old route serving `200` — proof
-   that mounted entries are not re-imported. Do not plan a hot-swap.
+   once per process, keyed by resolved URL, with no cache-busting. Changing a
+   package's files therefore needs a `dsh web` restart.
+2. **Patch edits behave differently depending on their kind** — all three
+   verified against a running server: a *new* row is mounted live; a *removed*
+   row is unloaded live, and the served boot graph drops it without a restart; a
+   *changed* row is **not** re-imported, and pointing an existing row at a
+   nonexistent specifier left the old route serving `200`. Do not plan a
+   hot-swap of an existing entry; restart instead.
 3. **`renderPrompt` throws on an unresolved `{{variable}}`**, and DSH has no
    escape syntax. If a user can type prompt text, validate it — otherwise you
    break every later request. In your own preview, degrade to tolerant
