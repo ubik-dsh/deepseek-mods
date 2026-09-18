@@ -170,7 +170,7 @@ Tell the user exactly:
 | Rows are in the patch file but a mod is missing from the roster | the page was not reloaded, or the row names a package the loader cannot resolve — and a row whose import failed once stays failed | reload; then read the browser console. If it is still missing, check that the package sits in `@local/` under its **own package name** (`@local/dsh-locale-ru` → `dsh-locale-ru`) and restart `dsh web` |
 | The mod is in the roster but its UI is absent | the target slot does not exist in this DSH version | see [Compatibility](../README.md#compatibility); the slot name is version-specific |
 | Русский is not in the language list | the page was loaded before the pack was installed | reload the page |
-| A mod was working, then you edited its files and it reverted | the running process still has the old module cached | restart `dsh web` |
+| A mod was working, then it reverted to older behaviour after you edited its files or re-ran the installer | the running process serves the build it loaded at boot — both halves are cached, the host module and the browser bundle | restart `dsh web`; reloading the page is not enough, because the bundle is assembled once and then held in memory |
 | `dsh plugin --profile web …` was run and the mods disappeared | pnpm removed packages the profile manifest does not list | re-run `node tools/install.mjs` |
 
 ## Undo

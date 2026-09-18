@@ -62,6 +62,14 @@ Four behaviours, each verified against a running server rather than inferred:
   answering `200` — mounted entries are not re-created, and the loader imports
   modules without cache-busting. Changing a package's files therefore needs a
   `dsh web` restart.
+- **Neither half is re-read from disk either.** After the installer updated an
+  already-installed package, the running server went on serving the previous
+  browser bundle: the `/plugins/??…&rev=` value was unchanged and the served
+  bytes still lacked the fix, while the file on disk had it. Reloading the page
+  changes nothing in that state — only a restart does. This is why the installer
+  says "reload, and restart after an update", and it is the second time a mod
+  appeared to be at fault when the running process was simply holding the build
+  it booted with.
 - **A row whose import failed once stays failed.** A row naming a package the
   loader cannot resolve leaves that entry in an error state, and rewriting the row
   afterwards does not recover it — while a server that boots with the same row
