@@ -117,3 +117,46 @@ If you would rather not install git: on the repository page use
 **Add file → Upload files**, drag the contents of this directory (not the
 directory itself), and commit. The browser cannot upload empty directories, but
 none are required here.
+
+## The GitVerse public API
+
+`git push` puts the files there; the REST API finishes the job — description,
+privacy, and checking whether CI actually ran.
+
+Reference: <https://gitverse.ru/docs/developers/public-api/>
+
+- **Base URL is `https://api.gitverse.ru`** — not `gitverse.ru/api/…`. The Gitea
+  style `/api/v1/…` paths answer with HTML 404.
+- **Auth:** `Authorization: Bearer <token>`.
+- **Required header:** `Accept: application/vnd.gitverse.object+json;version=1`.
+  Without it the API answers with HTML instead of JSON, which looks like a wrong
+  URL but is a missing header.
+- **Token:** Settings → Tokens. The scope **Repositories: Read and write** covers
+  every call below; nothing else is needed.
+
+| Task | Call |
+|---|---|
+| Who the token belongs to | `GET /user` |
+| Repository state | `GET /repos/{owner}/{repo}` |
+| Branches (verify a push) | `GET /repos/{owner}/{repo}/branches` |
+| One file | `GET /repos/{owner}/{repo}/contents/{path}` |
+| Commits | `GET /repos/{owner}/{repo}/commits` |
+| Set description or privacy | `PATCH /repos/{owner}/{repo}` with `{ "description": "…" }` or `{ "private": true }` |
+| Did CI run? | `GET /repos/{owner}/{repo}/actions/runs` |
+
+A token is also what an agent needs to check its own work, so the workflow that
+keeps a token out of a chat transcript is worth knowing: **save it to a file and
+let the tooling read the file**, rather than pasting it into the conversation.
+
+```powershell
+# once, by hand: put the token in a file, never in a command line
+Set-Content -Path .gitverse-token -Value '<token>' -NoNewline
+```
+
+```powershell
+# then the token is only ever a variable
+$token = (Get-Content .gitverse-token -Raw).Trim()
+git push "https://$env:GITVERSE_USER:$token@gitverse.ru/$env:GITVERSE_USER/dsh-mods.git" main
+```
+
+Remember to revoke the token and delete the file when the work is done.

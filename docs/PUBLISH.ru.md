@@ -116,3 +116,46 @@ git push
 Если ставить git не хочется: на странице репозитория — **Add file → Upload
 files**, перетащи содержимое этого каталога (не сам каталог) и закоммить.
 Браузер не умеет загружать пустые каталоги, но здесь они и не нужны.
+
+## Публичный API GitVerse
+
+`git push` кладёт файлы, а REST API доводит дело до конца: описание, приватность
+и проверка того, что CI действительно отработал.
+
+Документация: <https://gitverse.ru/docs/developers/public-api/>
+
+- **База — `https://api.gitverse.ru`**, а не `gitverse.ru/api/…`. Пути в стиле
+  Gitea (`/api/v1/…`) отвечают HTML-страницей 404.
+- **Авторизация:** `Authorization: Bearer <токен>`.
+- **Обязательный заголовок:** `Accept: application/vnd.gitverse.object+json;version=1`.
+  Без него API отдаёт HTML вместо JSON — выглядит как неверный адрес, а на самом
+  деле не хватает заголовка.
+- **Токен:** Настройки → Токены. Права **Репозитории: Чтение + Запись** покрывают
+  все вызовы ниже; больше ничего не нужно.
+
+| Задача | Вызов |
+|---|---|
+| Кому принадлежит токен | `GET /user` |
+| Состояние репозитория | `GET /repos/{owner}/{repo}` |
+| Ветки (проверить пуш) | `GET /repos/{owner}/{repo}/branches` |
+| Один файл | `GET /repos/{owner}/{repo}/contents/{path}` |
+| Коммиты | `GET /repos/{owner}/{repo}/commits` |
+| Задать описание или приватность | `PATCH /repos/{owner}/{repo}` с `{ "description": "…" }` или `{ "private": true }` |
+| Отработал ли CI | `GET /repos/{owner}/{repo}/actions/runs` |
+
+Токен же нужен агенту, чтобы проверять свою работу. Поэтому полезно знать приём,
+который не пускает токен в переписку: **сохранить его в файл и дать инструментам
+читать файл**, а не вставлять в чат.
+
+```powershell
+# один раз, руками: токен попадает в файл, а не в командную строку
+Set-Content -Path .gitverse-token -Value '<токен>' -NoNewline
+```
+
+```powershell
+# дальше токен — просто переменная
+$token = (Get-Content .gitverse-token -Raw).Trim()
+git push "https://$env:GITVERSE_USER:$token@gitverse.ru/$env:GITVERSE_USER/dsh-mods.git" main
+```
+
+Не забудь отозвать токен и удалить файл, когда работа закончена.
