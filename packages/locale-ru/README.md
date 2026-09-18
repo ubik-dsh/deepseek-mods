@@ -6,6 +6,8 @@ language-pack API.
 
 *Русская версия: [README.ru.md](README.ru.md).*
 
+![Language selection in Russian](../../docs/screenshots/russian-settings.png)
+
 ## Coverage
 
 | Metric | Value |

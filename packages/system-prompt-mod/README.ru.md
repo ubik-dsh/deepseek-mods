@@ -6,6 +6,8 @@
 
 *English version: [README.md](README.md).*
 
+![Окно редактора с загруженным живым промптом](../../docs/screenshots/prompt-editor.png)
+
 ## Что делает
 
 | Половина | Роль |

@@ -6,6 +6,8 @@
 
 *English version: [README.md](README.md).*
 
+![Выбор языка: Русский](../../docs/screenshots/russian-settings.png)
+
 ## Покрытие
 
 | Метрика | Значение |

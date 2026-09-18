@@ -6,6 +6,8 @@ result on the next model request — no restart.
 
 *Русская версия: [README.ru.md](README.ru.md).*
 
+![The editor dialog with the live prompt loaded](../../docs/screenshots/prompt-editor.png)
+
 ## What it does
 
 | Half | Role |
