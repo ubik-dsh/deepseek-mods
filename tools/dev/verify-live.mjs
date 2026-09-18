@@ -107,6 +107,24 @@ record(
     : `HTTP ${String(route.status)}`,
 )
 
+// 5. the mod manager's route answers and describes this home
+const managerRoute = await get('/api/mod-manager.mod')
+let managerBody = null
+try {
+  managerBody = await managerRoute.json()
+} catch {}
+const layersShaped = Array.isArray(managerBody?.layers)
+  && managerBody.layers.every((layer) => typeof layer.key === 'string' && Array.isArray(layer.rows))
+record(
+  'the mod manager route answers and describes this home',
+  managerRoute.status === 200 && managerBody?.ok === true && layersShaped,
+  managerRoute.status === 200
+    ? `HTTP 200, ${String(managerBody?.layers?.length ?? 0)} layer(s), ${String(
+      (managerBody?.layers ?? []).reduce((total, layer) => total + layer.rows.length, 0),
+    )} row(s), home=${String(managerBody?.home)}`
+    : `HTTP ${String(managerRoute.status)} — the row is not mounted; restart \`dsh web\` if it was added while the server was running after a failed import`,
+)
+
 // verdict
 const failed = results.filter((result) => !result.ok)
 console.log('')

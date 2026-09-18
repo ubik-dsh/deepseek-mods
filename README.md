@@ -5,12 +5,13 @@ agent harness whose browser UI is the `dsh web` GUI.
 
 > **Repository:** <https://gitverse.ru/ubikon/dsh-mods>
 
-Two mods live here:
+Three mods live here:
 
 | Mod | What it does |
 |---|---|
 | **[system-prompt-mod](packages/system-prompt-mod)** | A **Промпт / Prompt** button in the chat header that opens the live system prompt, lets you edit it, and applies the result on the next model request — no restart. |
 | **[locale-ru](packages/locale-ru)** | **Russian localization** for the whole GUI: 42 namespaces, 1257 strings, selectable in Settings → General → Language. |
+| **[mod-manager](packages/mod-manager)** | A **Mods** tab in Settings → Plugins: what is installed, whether the page was actually served it, and turn-off / turn-on / remove — without a restart. |
 
 *Русская версия этого файла: [README.ru.md](README.ru.md).*
 
@@ -25,6 +26,11 @@ with `{{model}}`, `{{cwd}}` and preset layers already resolved.*
 ![Language selection in Russian](docs/screenshots/russian-settings.png)
 
 *The language pack adds **Русский** to Settings → General → Language.*
+
+![The Mods tab listing installed mods](docs/screenshots/mods-panel.png)
+
+*The mod manager lists every loader row, whether the page was served it, and what
+can be done with it.*
 
 ---
 
@@ -200,6 +206,7 @@ docs/
   AI-PROMPT.md         prompt + reference for having an AI build a new mod
   VERIFICATION.md      every check that was run, and what was not covered
   PUBLISH.md           how to publish this repository (GitHub, GitVerse)
+  ROADMAP.md           mod ideas that are not built yet
   screenshots/         images used by this file
 .github/workflows/
   ci.yaml              checks that need only Node — runs on GitHub and GitVerse

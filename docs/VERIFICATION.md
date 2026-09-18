@@ -31,30 +31,42 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 17 | A stranger can read and clone it | `node _dsh_mod/verify-public.mjs` | **PASS** — page `HTTP 200`; anonymous `ls-remote`; anonymous clone with `README.md`, `README.ru.md`, `LICENSE`, both packages |
 | 18 | Every live check on the running GUI | `node tools/dev/verify-live.mjs` | **PASS** — 5 of 5: page 28 185 bytes, 168 boot rows, **24 827** Cyrillic characters in the served bundle, route `200` |
 | 19 | The secret scanner can fail | planted key on disk, then committed and deleted, then a tracked `.env` | **FAIL** ×3, each on the right finding — including the deleted-but-still-stored blob |
+| 20 | Mod manager, host half | `node tools/dev/test-mod-manager.mjs` | **PASS** — 27 checks: patch parsing, every action, and every refusal |
+| 21 | Mod manager, browser bundle | `node tools/dev/test-mod-manager-client.mjs` | **PASS** — 13 checks on a React stub that honours hook dependencies |
+| 22 | A clean home installs and boots | `node tools/install.mjs`, then `dsh web` on a scratch home | **PASS** — packages land under `@local/dsh-*`, 171 boot rows, all three mods listed, both host routes `200` |
+| 23 | Turning a mod off and on from the panel, in the real GUI | headless Edge: Settings → Plugins → Mods | **PASS** — turning the prompt mod off removed its row and the route answered `404`; turning it back on restored both; 0 console errors |
+| 24 | The installer places packages where the loader looks | clean home, then read `@local/` | **PASS** — `dsh-locale-ru`, `dsh-mod-manager`, `dsh-system-prompt-mod`; installing under the repository's folder name had left a clean home unable to boot at all |
 
 ### Reproducing this table
 
-Rows 1–8, 13–16 and 19 run from a fresh clone with Node alone. Rows 11, 12 and 18
-need a running instance, and `tools/dev/verify-live.mjs` lives in the repository,
-so they need nothing more than that. Rows 9 and 10 are the browser checks: they
-need Windows, Edge and a running `dsh web`, and live in `tools/dev` as
-machine-specific harness. Row 17 needs network access and is the only row whose
-command lives outside the repository — it verifies the *published* copy rather
-than a checkout, which is a different question from the rest of the table.
+Rows 1–8, 13–16 and 19–21 run from a fresh clone with Node alone. Rows 11, 12, 18,
+22 and 24 need a running instance; `tools/dev/verify-live.mjs` lives in the
+repository, so they need nothing more than that and a scratch home. Rows 9, 10 and
+23 are the browser checks: they need Windows, Edge and a running `dsh web`, and
+live in `tools/dev` as machine-specific harness. Row 17 needs network access and is
+the only row whose command lives outside the repository — it verifies the
+*published* copy rather than a checkout, which is a different question from the
+rest of the table.
 
 ## What the run established about DSH itself
 
-Three behaviours, each verified against a running server rather than inferred:
+Four behaviours, each verified against a running server rather than inferred:
 
-- **A new loader row is mounted live.** The mod appeared in the running GUI's
-  boot graph right after the row was added to `cordis.patch.yml`.
-- **A removed row is unloaded live.** After `--uninstall`, the served boot graph
-  dropped both packages with no restart (check 13).
+- **A new loader row is mounted live.** Adding a row to `cordis.patch.yml` while
+  the server runs puts the package into the served boot graph within seconds, with
+  no restart. Measured in both directions on a scratch instance.
+- **A removed row is unloaded live.** Removing the row of a mounted package drops
+  it from the boot graph, and restoring the row brings it back (checks 13 and 22).
 - **A changed row is not re-imported.** Pointing an existing row at a
   nonexistent specifier (`@local/dsh-system-prompt-mod/nope`) left the old route
   answering `200` — mounted entries are not re-created, and the loader imports
   modules without cache-busting. Changing a package's files therefore needs a
   `dsh web` restart.
+- **A row whose import failed once stays failed.** A row naming a package the
+  loader cannot resolve leaves that entry in an error state, and rewriting the row
+  afterwards does not recover it — while a server that boots with the same row
+  works. This is why the installer says "reload the GUI" and why a restart is the
+  fallback when a row was already present from a failed attempt.
 
 The first two make installation and removal pleasant; the third is why the
 install runbook tells a user to restart after an upgrade rather than promising a

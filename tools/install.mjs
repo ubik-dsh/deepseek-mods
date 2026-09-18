@@ -111,7 +111,22 @@ function discoverPackages() {
     .filter((name) => existsSync(join(PACKAGES_DIR, name, 'package.json')))
     .map((directory) => {
       const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, directory, 'package.json'), 'utf8'))
-      return { directory, id: directory, package: manifest.name, client: manifest.dsh?.client !== undefined }
+      // Node resolves the row's `name` to a directory of that same name under
+      // `@local/`, so the copy must land in the last segment of the package's
+      // own name. The repository folder may differ from it — `packages/locale-ru`
+      // holds `@local/dsh-locale-ru` — and installing under the folder name put
+      // the package where the loader would never look for it.
+      const destination = String(manifest.name ?? '').split('/').pop()
+      if (destination === '' || destination.includes('\\') || destination.includes('/')) {
+        throw new Error(`${directory}: package.json has no usable name`)
+      }
+      return {
+        directory,
+        id: directory,
+        package: manifest.name,
+        destination,
+        client: manifest.dsh?.client !== undefined,
+      }
     })
 }
 
@@ -184,7 +199,7 @@ if (UNINSTALL) {
     if (kept.length > 0) say(t.rowsKept(label, kept.join(', ')))
   }
   for (const entry of packages) {
-    const destination = join(home, 'profiles', 'node_modules', '@local', entry.directory)
+    const destination = join(home, 'profiles', 'node_modules', '@local', entry.destination)
     if (!existsSync(destination)) continue
     if (!DRY_RUN) rmSync(destination, { recursive: true, force: true })
     say(t.removed(entry.package))
@@ -207,8 +222,8 @@ if (UNINSTALL) {
 // snapshotted. Only a package that is absent or *different* is installed, and
 // only a different one has a previous state worth preserving.
 const target = join(home, 'profiles', 'node_modules', '@local')
-const installed = packages.filter((entry) => existsSync(join(target, entry.directory)))
-const unchanged = installed.filter((entry) => sameTree(join(target, entry.directory), join(PACKAGES_DIR, entry.directory)))
+const installed = packages.filter((entry) => existsSync(join(target, entry.destination)))
+const unchanged = installed.filter((entry) => sameTree(join(target, entry.destination), join(PACKAGES_DIR, entry.directory)))
 const stale = installed.filter((entry) => !unchanged.includes(entry))
 const toInstall = packages.filter((entry) => !unchanged.includes(entry))
 
@@ -223,7 +238,7 @@ if (backedUp) {
   }
   for (const entry of stale) {
     // The installed copy is what the next step overwrites.
-    cpSync(join(target, entry.directory), join(backupDir, 'packages', entry.directory), { recursive: true })
+    cpSync(join(target, entry.destination), join(backupDir, 'packages', entry.destination), { recursive: true })
   }
   say(t.backupPackages(join(backupDir, 'packages')))
 } else if (!DRY_RUN) {
@@ -245,7 +260,7 @@ for (const entry of packages) {
     say(t.skipped(entry.package))
     continue
   }
-  const destination = join(target, entry.directory)
+  const destination = join(target, entry.destination)
   if (!toInstall.includes(entry)) {
     say(t.unchanged(entry.package))
     continue

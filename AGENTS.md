@@ -8,6 +8,8 @@ are an AI agent working here, read this first.
 - `packages/system-prompt-mod/` — a dual-face plugin (host + browser): a chat
   header control that shows and edits the live system prompt.
 - `packages/locale-ru/` — a browser-only plugin: the Russian language pack.
+- `packages/mod-manager/` — a dual-face plugin: a Settings tab that lists
+  installed mods and turns them off, on, or removes them.
 - `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
   the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
@@ -50,6 +52,8 @@ node tools/dev/test-host.mjs           # prompt mod, host half
 node tools/dev/test-client.mjs         # prompt mod, browser bundle
 node tools/dev/test-locale-ru.mjs      # language pack contract
 node tools/dev/test-links.mjs          # markdown links and anchors
+node tools/dev/test-mod-manager.mjs    # mod manager, host half
+node tools/dev/test-mod-manager-client.mjs  # mod manager, browser bundle
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 ```

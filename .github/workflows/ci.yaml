@@ -37,6 +37,12 @@ jobs:
       - name: Prompt mod browser bundle
         run: node tools/dev/test-client.mjs
 
+      - name: Mod manager host half
+        run: node tools/dev/test-mod-manager.mjs
+
+      - name: Mod manager browser bundle
+        run: node tools/dev/test-mod-manager-client.mjs
+
       - name: Markdown links and anchors
         run: node tools/dev/test-links.mjs
 
@@ -59,6 +65,15 @@ jobs:
           done
           test -f "$DSH_HOME/profiles/node_modules/@local/locale-ru/lib/client.js" \
             || { echo "package was not installed"; exit 1; }
+          # The row names `@local/dsh-locale-ru`, and Node resolves that to a
+          # directory of the same name — so the copy must land there, not in the
+          # repository's folder name. Installing under the folder name left the
+          # package where the loader never looked, and a clean home failed to
+          # boot at all.
+          for name in dsh-locale-ru dsh-mod-manager dsh-system-prompt-mod; do
+            test -f "$DSH_HOME/profiles/node_modules/@local/$name/package.json" \
+              || { echo "$name was not installed under its own package name"; exit 1; }
+          done
           node tools/install.mjs --dry-run
           # Re-running must be a true no-op: it reports the packages as current
           # and leaves no backup snapshot behind. This is a regression guard —
