@@ -76,7 +76,7 @@ const SNAPSHOT = {
   mode: 'append',
   text: '',
   active: false,
-  path: 'C:\\Users\\admin\\.dsh\\system-prompt-mod.json',
+  path: 'C:\\Users\\you\\.dsh\\system-prompt-mod.json',
   section: 'mod:user-system-prompt',
   order: 10300,
   basePrompt: 'You are an AI agent powered by DeepSeek Harness.',

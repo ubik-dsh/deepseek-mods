@@ -11,7 +11,8 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, openSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { homedir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -20,10 +21,15 @@ const port = Number(process.argv[3] ?? 3080)
 
 const LOG = join(here, 'restart-web.log')
 const OUT = join(here, 'restart-web.out.log')
-const NODE = 'C:\\Program Files\\nodejs\\node.exe'
-const BIN = 'C:\\Users\\admin\\AppData\\Local\\npm-cache\\_npx\\1e7f6d9597241db0\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js'
-const CWD = 'C:\\Users\\admin\\Documents\\ds1'
-const HOME = 'C:\\Users\\admin\\.dsh'
+// Derived rather than written down: a literal home directory in a public
+// repository names the machine's account for no benefit. Override any of these
+// with the environment when the defaults do not match.
+const NODE = process.execPath
+const BIN = process.env.DSH_BIN
+  ?? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'npm-cache', '_npx',
+    '1e7f6d9597241db0', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+const CWD = process.env.DSH_CWD ?? resolve(here, '..', '..', '..')
+const HOME = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 
 const log = (message) => {
   appendFileSync(LOG, `[${new Date().toISOString()}] ${message}\n`)

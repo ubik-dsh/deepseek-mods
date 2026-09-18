@@ -100,22 +100,22 @@ function makeReact() {
 
 const SNAPSHOT = {
   ok: true,
-  home: 'C:\\Users\\admin\\.dsh',
+  home: 'C:\\Users\\you\\.dsh',
   selfPackage: '@local/dsh-mod-manager',
   managedPrefix: '@local/',
-  backupRoot: 'C:\\Users\\admin\\.dsh\\mod-backups',
+  backupRoot: 'C:\\Users\\you\\.dsh\\mod-backups',
   layers: [
     {
       key: 'home',
       label: 'home (all profiles)',
-      path: 'C:\\Users\\admin\\.dsh\\cordis.patch.yml',
+      path: 'C:\\Users\\you\\.dsh\\cordis.patch.yml',
       exists: true,
       rows: [],
     },
     {
       key: 'profile:web',
       label: 'profile web',
-      path: 'C:\\Users\\admin\\.dsh\\profiles\\web\\cordis.patch.yml',
+      path: 'C:\\Users\\you\\.dsh\\profiles\\web\\cordis.patch.yml',
       exists: true,
       rows: [
         {

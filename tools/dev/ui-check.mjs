@@ -13,7 +13,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -66,7 +66,9 @@ async function createSession() {
       type: 'client-request',
       rpcId: crypto.randomUUID(),
       method: 'session/create',
-      payload: { args: { request: { cwd: 'C:\\Users\\admin\\Documents\\ds1' } } },
+      // Derived from this script's location, not written down: a literal user
+      // directory in a public repository names the machine's account.
+      payload: { args: { request: { cwd: process.env.DSH_CWD ?? resolve(here, '..', '..', '..') } } },
     }),
   })
   const body = await response.json()

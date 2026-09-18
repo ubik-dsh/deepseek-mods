@@ -7,6 +7,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# The workspace a test session is opened in. Derived from this script's own
+# location (tools/dev -> repo -> its parent) rather than written down: a literal
+# user directory in a public repository names the machine's account for nothing.
+$workspace = if ($env:DSH_CWD) { $env:DSH_CWD }
+  else { Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) }
+
 # 1. Authenticate the browser session.
 $index = Invoke-WebRequest -Uri "$Base/?token=$Token" -SessionVariable sess -UseBasicParsing -TimeoutSec 30
 Write-Output "index status=$($index.StatusCode) len=$($index.Content.Length)"
@@ -35,7 +41,7 @@ $createBody = @{
   type    = 'client-request'
   rpcId   = $rpcId
   method  = $endpoint
-  payload = @{ args = @{ request = @{ cwd = 'C:\Users\you\Documents\ds1' } } }
+  payload = @{ args = @{ request = @{ cwd = $workspace } } }
 } | ConvertTo-Json -Compress -Depth 8
 
 try {

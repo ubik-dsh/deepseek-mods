@@ -7,11 +7,16 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const file = 'C:\\Users\\admin\\.dsh\\profiles\\node_modules\\@deepseek-ai\\dsh-client-ui-directory-picker-browse\\lib\\client.js'
+// The Harness home, not a literal path: this repository is public and a
+// hard-coded user directory names the machine's account for no benefit.
+const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+const file = join(home, 'profiles', 'node_modules', '@deepseek-ai',
+  'dsh-client-ui-directory-picker-browse', 'lib', 'client.js')
 const text = readFileSync(file, 'utf8')
 
 /** Index of the bracket matching the opener at `start`, ignoring string bodies. */
