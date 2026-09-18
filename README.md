@@ -12,6 +12,18 @@ Two mods live here:
 
 *Русская версия этого файла: [README.ru.md](README.ru.md).*
 
+![The Prompt control in the session header](docs/screenshots/header-button.png)
+
+![The editor showing the live system prompt](docs/screenshots/prompt-editor.png)
+
+*The **Промпт** control sits with the session header actions; the dialog shows
+the prompt the model actually receives — assembled in the live agent's scope,
+with `{{model}}`, `{{cwd}}` and preset layers already resolved.*
+
+![Language selection in Russian](docs/screenshots/russian-settings.png)
+
+*The language pack adds **Русский** to Settings → General → Language.*
+
 ---
 
 ## Requirements
@@ -171,6 +183,9 @@ docs/
   AI-PROMPT.md         prompt + reference for having an AI build a new mod
   VERIFICATION.md      every check that was run, and what was not covered
   PUBLISH.md           how to publish this repository (GitHub, GitVerse)
+  screenshots/         images used by this file
+.github/workflows/
+  ci.yaml              checks that need only Node — runs on GitHub and GitVerse
 AGENTS.md              what a DSH agent working here should know — loaded automatically
 ```
 

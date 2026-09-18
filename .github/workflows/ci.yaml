@@ -1,0 +1,67 @@
+# Checks that need only Node — no DSH installation, no network.
+#
+# Deliberately named `.yaml`, not `.yml`: GitVerse's runner processes
+# `.gitverse/workflows/*.yaml` and also `.yaml` files under `.github/workflows/`
+# (https://gitverse.ru/docs/cicd/docs/workflow/), while GitHub accepts both
+# spellings. One file therefore runs on both hosts.
+#
+# No platform-specific contexts are used (`runner.temp` is GitHub-only), so the
+# scratch Harness home is a plain relative directory.
+#
+# `tools/dev/test-host.mjs` is deliberately absent: it imports
+# `@deepseek-ai/dsh-system-prompt` to exercise the real prompt assembly, which
+# exists only on a machine with DSH installed. See docs/VERIFICATION.md.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      DSH_HOME: .ci-dsh-home
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Language pack contract
+        run: node tools/dev/test-locale-ru.mjs
+
+      - name: Prompt mod browser bundle
+        run: node tools/dev/test-client.mjs
+
+      - name: Language bundle is reproducible from its sources
+        run: |
+          node tools/build-locale.mjs
+          git diff --exit-code -- packages/locale-ru/lib/client.js
+
+      - name: Installer round trip in a scratch home
+        run: |
+          mkdir -p "$DSH_HOME/profiles/web"
+          printf '[]\n' > "$DSH_HOME/profiles/web/cordis.patch.yml"
+          node tools/install.mjs --lang en
+          for id in system-prompt-mod locale-ru; do
+            grep -q "id: $id" "$DSH_HOME/profiles/web/cordis.patch.yml" \
+              || { echo "row $id was not added"; exit 1; }
+          done
+          test -f "$DSH_HOME/profiles/node_modules/@local/locale-ru/lib/client.js" \
+            || { echo "package was not installed"; exit 1; }
+          node tools/install.mjs --dry-run
+          node tools/install.mjs --uninstall
+          grep -q '^\[\]$' "$DSH_HOME/profiles/web/cordis.patch.yml" \
+            || { echo "patch file was not restored"; exit 1; }
+          if grep -q 'id: ' "$DSH_HOME/profiles/web/cordis.patch.yml"; then
+            echo "rows were not removed"; exit 1
+          fi
+          echo "installer round trip OK"
+
+      - name: Clean the scratch home
+        if: always()
+        run: rm -rf "$DSH_HOME"
