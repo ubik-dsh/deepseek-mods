@@ -18,17 +18,29 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 4 | Language pack contract and key coverage | `node tools/dev/test-locale-ru.mjs` | **PASS** — 42 namespaces, 1257 keys, 1195 with Cyrillic |
 | 5 | Language bundle reproducible from `i18n/` | `node tools/build-locale.mjs` | rebuilt file **byte-identical** to the committed one |
 | 6 | Installer is a no-op when everything is installed | `node tools/install.mjs --dry-run` | every row already present, nothing written |
-| 7 | Prompt mod loaded in a running server | `node _dsh_mod/probe-3080.mjs` | `GET /api/system-prompt.mod` → **200**, new host half |
+| 7 | Prompt mod's route on a running server | `node tools/dev/verify-live.mjs` | `GET /api/system-prompt.mod` → **200**, `section=mod:user-system-prompt`, `order=10300`, every documented key present |
 | 8 | Both mods in the served boot graph (live GUI) | `node tools/boot-check.mjs` | **OK** ×2 of 168 client rows |
 | 9 | Prompt mod rendered in a real browser, live GUI | `node _dsh_mod/ui-check.mjs …` | control present; dialog **760 px**; "Load current" filled the editor with **7041 characters**; 0 console errors |
 | 10 | Language pack switched in a real browser | `node _dsh_mod/ui-locale.mjs` | pack in roster; **Русский** offered; → English (`lang=en`) → back to Русский (`lang=ru`); 620 Cyrillic characters; 0 console errors |
 | 11 | Install into a **clean** Harness home, then boot | `node tools/install.mjs` + `dsh web` | both mods in the served boot graph |
-| 12 | Host route on that clean instance | probe | **200**, new host half |
+| 12 | The same checks on a clean instance **without** the mods | `node tools/dev/verify-live.mjs http://127.0.0.1:3089` | **FAIL** ×4 — packages absent from the boot graph, route `404`. This is the row that shows checks 7 and 18 can fail |
 | 13 | Uninstall on a running instance | `node tools/install.mjs --uninstall` | packages and rows removed; patch restored to `[]`; both rows became **MISS** in the served boot graph **without a restart** |
-| 14 | Re-running the installer writes nothing | `node tools/install.mjs` twice | second run: `is already up to date` ×2, no `mod-backups` directory created |
+| 14 | Re-running the installer writes nothing | `node tools/install.mjs` twice | second run: every package reported current (`is already up to date` in English, `уже актуален` under `--lang ru`), no `mod-backups` directory created |
 | 15 | Markdown links and anchors resolve | `node tools/dev/test-links.mjs` | **PASS** — 16 files, 65 relative links |
-| 16 | No secret in anything published | `node _dsh_mod/public-scan.mjs` | **CLEAN** — 126 tracked names, 154 blobs including unreachable ones, no key or password |
+| 16 | No secret in anything published | `node tools/dev/scan-secrets.mjs --git <path>` | **PASS** — 127 tracked names, 162 blobs including unreachable ones, 131 files on disk, no key or password |
 | 17 | A stranger can read and clone it | `node _dsh_mod/verify-public.mjs` | **PASS** — page `HTTP 200`; anonymous `ls-remote`; anonymous clone with `README.md`, `README.ru.md`, `LICENSE`, both packages |
+| 18 | Every live check on the running GUI | `node tools/dev/verify-live.mjs` | **PASS** — 5 of 5: page 28 185 bytes, 168 boot rows, **24 827** Cyrillic characters in the served bundle, route `200` |
+| 19 | The secret scanner can fail | planted key on disk, then committed and deleted, then a tracked `.env` | **FAIL** ×3, each on the right finding — including the deleted-but-still-stored blob |
+
+### Reproducing this table
+
+Rows 1–8, 13–16 and 19 run from a fresh clone with Node alone. Rows 11, 12 and 18
+need a running instance, and `tools/dev/verify-live.mjs` lives in the repository,
+so they need nothing more than that. Rows 9 and 10 are the browser checks: they
+need Windows, Edge and a running `dsh web`, and live in `tools/dev` as
+machine-specific harness. Row 17 needs network access and is the only row whose
+command lives outside the repository — it verifies the *published* copy rather
+than a checkout, which is a different question from the rest of the table.
 
 ## What the run established about DSH itself
 
@@ -62,7 +74,7 @@ reviewers never touched the real Harness home.
 |---|---|---|
 | 1 | **No** — a stranger would have to ask the author a question | — |
 | 2 | **No** | 6.5 / 10 |
-| 3 | pending | pending |
+| 3 | **Yes** — a stranger got through without asking the author a question | 9 / 10 |
 
 ### What the reviews found, and what changed
 
@@ -79,6 +91,10 @@ reviewers never touched the real Harness home.
 | `git` was required but absent from Requirements | Added |
 | Development UI scripts wrote screenshots into the repository and used inconsistent ports | Screenshots moved to a temp directory (override with `DSH_SHOTS`), port made a parameter, all documented in `tools/dev/README.md` |
 | Re-running the installer still accumulated backup snapshots, and a code comment claimed otherwise | `treeDigest()` / `sameTree()` compare content digests, so a second run prints `already up to date` and writes nothing — verified as a full install/install/uninstall round trip |
+| The evidence table cited one-off scripts living outside the repository, so it could not be re-run from a clone | Added `tools/dev/verify-live.mjs`, which reproduces those rows from inside the repository, and moved the cookie logic into a shared `tools/lib/session-cookie.mjs` so the credential handling has one source of truth |
+| `--backup-only` printed a backup path on a clean tree without creating it | It now reports that there was nothing to back up and creates no directory; the flag's behaviour is documented in the README |
+| `test-host.mjs` wipes and rewrites `tools/dev/_testhome-host/` inside the checkout | Documented in `tools/dev/README.md`; the directory was already covered by `.gitignore`, confirmed with `git check-ignore` rather than assumed |
+| The idempotence row quoted an English phrase that only appears when the installer runs in English | The row now names both wordings |
 
 The idempotence finding is worth calling out because it was a real defect in the
 tool, not just in the prose: the first fix removed backups on a *clean* install

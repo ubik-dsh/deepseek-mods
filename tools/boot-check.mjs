@@ -14,36 +14,21 @@
  * @module tools/boot-check
  */
 
-import { createHash, createHmac } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { mintSessionCookie } from './lib/session-cookie.mjs'
 
 const base = process.argv[2] ?? 'http://127.0.0.1:3080'
 const names = process.argv.slice(3)
-const authority = new URL(base).host
 const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 
-const credentials = join(home, '.credentials.yaml')
-let secret
+let cookie
 try {
-  const text = readFileSync(credentials, 'utf8')
-  const block = text.slice(text.indexOf('client-connection/browser-session:'))
-  secret = Buffer.from(/^\s*secret:\s*(\S+)\s*$/mu.exec(block)[1], 'base64url')
+  cookie = mintSessionCookie(base, home)
 } catch {
-  console.error(`cannot read the browser-session secret from ${credentials}`)
+  console.error(`cannot read the browser-session secret from ${join(home, '.credentials.yaml')}`)
   process.exit(2)
 }
-
-const issuedAt = Date.now()
-const body = Buffer.from(JSON.stringify({
-  version: 1,
-  authority,
-  issuedAt,
-  expiresAt: issuedAt + 3600_000,
-})).toString('base64url')
-const signature = createHmac('sha256', secret).update(body).digest('base64url')
-const cookie = `dsh-auth-${createHash('sha256').update(authority).digest('base64url')}=v1.${body}.${signature}`
 
 let response
 try {

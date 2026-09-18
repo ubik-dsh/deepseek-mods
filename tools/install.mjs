@@ -59,6 +59,7 @@ const MESSAGES = {
     dryRun: 'dry run: nothing was written',
     done: 'Done. Reload the Web GUI (F5) so the browser roster picks up the bundles.',
     backupDir: (path) => `Backups: ${path}`,
+    backupNone: 'nothing was backed up, so no backup directory was created',
     removed: (name) => `removed ${name}`,
     rowsRemoved: (label, ids) => `${label}: removed rows ${ids}`,
     rowsKept: (label, ids) => `${label}: rows ${ids} have a different shape — remove them by hand`,
@@ -79,6 +80,7 @@ const MESSAGES = {
     dryRun: 'пробный запуск: ничего не записано',
     done: 'Готово. Обнови страницу Web-GUI (F5), чтобы браузерный ростер подхватил бандлы.',
     backupDir: (path) => `Бэкапы: ${path}`,
+    backupNone: 'бэкапить было нечего, поэтому каталог бэкапов не создавался',
     removed: (name) => `удалён ${name}`,
     rowsRemoved: (label, ids) => `${label}: удалены строки ${ids}`,
     rowsKept: (label, ids) => `${label}: строки ${ids} записаны иначе — удали их вручную`,
@@ -229,7 +231,9 @@ if (backedUp) {
 }
 
 if (BACKUP_ONLY) {
-  say(t.backupDir(backupDir))
+  // Only name a directory that exists: on a clean tree nothing is snapshotted,
+  // and printing a path that was never created sends the reader looking for it.
+  say(backedUp ? t.backupDir(backupDir) : t.backupNone)
   process.exit(0)
 }
 

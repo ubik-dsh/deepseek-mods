@@ -73,9 +73,13 @@ node tools/install.mjs --lang ru        # Russian console output
 node tools/install.mjs --profile tui    # a profile other than `web`
 node tools/install.mjs --home-level     # rows also go to $DSH_HOME/cordis.patch.yml (all profiles)
 node tools/install.mjs --dry-run        # report what would change, write nothing
-node tools/install.mjs --backup-only    # snapshot only
+node tools/install.mjs --backup-only    # snapshot what a re-install would replace, then stop
 node tools/install.mjs --uninstall      # remove the packages and their rows
 ```
+
+`--backup-only` writes a snapshot only when there is something to preserve. When
+the installed packages already match this checkout it says so and creates no
+directory at all, rather than naming a path that does not exist.
 
 ## Verify
 

@@ -40,6 +40,9 @@ jobs:
       - name: Markdown links and anchors
         run: node tools/dev/test-links.mjs
 
+      - name: No secrets in tracked names, blobs, or the tree
+        run: node tools/dev/scan-secrets.mjs
+
       - name: Language bundle is reproducible from its sources
         run: |
           node tools/build-locale.mjs

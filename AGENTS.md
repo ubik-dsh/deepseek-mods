@@ -8,7 +8,8 @@ are an AI agent working here, read this first.
 - `packages/system-prompt-mod/` — a dual-face plugin (host + browser): a chat
   header control that shows and edits the live system prompt.
 - `packages/locale-ru/` — a browser-only plugin: the Russian language pack.
-- `tools/` — installer, verifier, builders. No absolute paths.
+- `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
+  the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
   live here**; the Windows/Edge scripts are not portable.
 
@@ -29,8 +30,9 @@ are an AI agent working here, read this first.
    take effect — hand the user the command.
 3. **Never commit or print secrets.** `$DSH_HOME/.credentials.yaml` holds API
    keys and the browser-session signing secret.
-4. **Verify with evidence.** Run `node tools/boot-check.mjs` (needs a running
-   `dsh web`) or a unit test; do not report success from reading code.
+4. **Verify with evidence.** Run `node tools/boot-check.mjs` or
+   `node tools/dev/verify-live.mjs` (both need a running `dsh web`) or a unit
+   test; do not report success from reading code.
 5. **Keep both languages in sync.** Every user-facing document exists as
    `X.md` (English) and `X.ru.md` (Russian).
 
@@ -48,6 +50,8 @@ node tools/dev/test-host.mjs           # prompt mod, host half
 node tools/dev/test-client.mjs         # prompt mod, browser bundle
 node tools/dev/test-locale-ru.mjs      # language pack contract
 node tools/dev/test-links.mjs          # markdown links and anchors
+node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
+node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 ```
 
 ## Editing cautions

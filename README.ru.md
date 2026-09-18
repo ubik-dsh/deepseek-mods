@@ -73,9 +73,13 @@ node tools/install.mjs --lang ru        # вывод на русском
 node tools/install.mjs --profile tui    # профиль вместо `web`
 node tools/install.mjs --home-level     # строки ещё и в $DSH_HOME/cordis.patch.yml (все профили)
 node tools/install.mjs --dry-run        # показать, что изменится, ничего не записывая
-node tools/install.mjs --backup-only    # только снапшот
+node tools/install.mjs --backup-only    # снапшот того, что затрёт переустановка, и остановка
 node tools/install.mjs --uninstall      # удалить пакеты и их строки
 ```
+
+`--backup-only` создаёт снапшот только тогда, когда есть что сохранять. Если
+установленные пакеты уже совпадают с этим репозиторием, он так и скажет и не
+создаст никакого каталога — вместо того чтобы назвать несуществующий путь.
 
 ## Проверка
 

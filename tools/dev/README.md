@@ -11,6 +11,8 @@ install or use them.
 | `test-client.mjs` | 6 checks on the prompt mod's browser bundle, with stub React and primitives | Node only |
 | `test-locale-ru.mjs` | Verifies the language pack's contract and full key coverage | Node only |
 | `test-links.mjs` | Checks every relative link and `#anchor` in the repository's Markdown | Node only |
+| `scan-secrets.mjs` | Looks for secrets in tracked names, in every blob (unreachable ones included) and on disk | Node, git |
+| `verify-live.mjs` | End-to-end HTTP checks against a running instance: boot graph, the translations actually served, the prompt route's documented shape | Node, a running `dsh web` |
 | `link-dsh.mjs` | Links the repository to a DSH installation so `@deepseek-ai/*` resolves for the unit tests | A DSH home |
 | `ui-check.mjs` | Renders the real GUI in headless Edge over CDP, opens a session, clicks the prompt control, screenshots | Windows, Edge, a running `dsh web` |
 | `ui-locale.mjs` | Same harness: opens Settings, switches the language, screenshots | Windows, Edge, a running `dsh web` |
@@ -18,6 +20,25 @@ install or use them.
 | `picker-extract.mjs` | Extracts the one dictionary the main extractor cannot follow (registered in a loop) | A DSH installation |
 | `locale-chunk.mjs` | Splits extracted dictionaries into balanced work groups for translation | A `locale-en.json` |
 | `restart-web.mjs` | Restarts the `dsh web` process that owns a port; written for one machine, adapt the paths at the top | Windows |
+
+### Live checks and the shared cookie helper
+
+`verify-live.mjs` answers what `tools/boot-check.mjs` does not: whether the
+served bundle really carries the translations, and whether the prompt route
+answers with the shape its README documents. It reproduces rows 7, 12 and 18 of
+[`docs/VERIFICATION.md`](../../docs/VERIFICATION.md) from a fresh clone — that
+table used to cite one-off scripts that lived outside the repository.
+
+Both it and `boot-check.mjs` mint the browser-session cookie through
+`tools/lib/session-cookie.mjs`, so the credential handling has one source of
+truth. The secret is read from `$DSH_HOME` and never printed.
+
+`scan-secrets.mjs` is what makes the "no secrets" claim checkable rather than
+asserted. It fails on a key shape, on a `.env` that got tracked, and — the case
+that matters — on a secret that was committed and then deleted, because the blob
+is still in the object database. It scans unreachable blobs too, since
+`git push --mirror` would send those. Without git it reports `PARTIAL` and exits
+2 rather than claiming a clean result it did not establish.
 
 ### The unit tests and DSH packages
 
@@ -31,8 +52,13 @@ node tools/dev/test-host.mjs
 ```
 
 The link lands in `node_modules/`, which git ignores. It is not needed for
-`test-client.mjs`, `test-locale-ru.mjs` or `test-links.mjs`, and never for
-installing or using the mods.
+`test-client.mjs`, `test-locale-ru.mjs`, `test-links.mjs` or `scan-secrets.mjs`,
+and never for installing or using the mods.
+
+`test-host.mjs` also writes: it points `DSH_HOME` at `tools/dev/_testhome-host/`,
+wipes it, and lets the host half create its state file there. That directory is
+inside the checkout but matches the `_testhome*/` rule in
+[`.gitignore`](../../.gitignore), so it never shows up in `git status`.
 
 ### The link check
 
@@ -79,6 +105,8 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 | `test-client.mjs` | 6 проверок браузерного бандла мода промпта на заглушках React и примитивов | Только Node |
 | `test-locale-ru.mjs` | Проверка контракта языкового пакета и полного покрытия ключей | Только Node |
 | `test-links.mjs` | Проверяет все относительные ссылки и `#якоря` в markdown репозитория | Только Node |
+| `scan-secrets.mjs` | Ищет секреты в именах файлов git, во всех блобах (включая недостижимые) и на диске | Node, git |
+| `verify-live.mjs` | Сквозные HTTP-проверки живого инстанса: boot-граф, реально отдаваемые переводы, документированная форма роута промпта | Node, запущенный `dsh web` |
 | `link-dsh.mjs` | Привязывает репозиторий к установке DSH, чтобы юнит-тесты видели `@deepseek-ai/*` | Домашний каталог DSH |
 | `ui-check.mjs` | Отрисовка настоящей GUI в headless Edge по CDP: открыть сессию, нажать кнопку промпта, снять скриншоты | Windows, Edge, запущенный `dsh web` |
 | `ui-locale.mjs` | Тот же стенд: открыть настройки, переключить язык, снять скриншоты | Windows, Edge, запущенный `dsh web` |
@@ -86,6 +114,25 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 | `picker-extract.mjs` | Извлекает единственный словарь, который не берёт основной извлекатель (он регистрируется в цикле) | Установленный DSH |
 | `locale-chunk.mjs` | Нарезает извлечённые словари на сбалансированные группы для перевода | Файл `locale-en.json` |
 | `restart-web.mjs` | Перезапускает процесс `dsh web`, владеющий портом; написан под одну машину — поправь пути в начале файла | Windows |
+
+### Живые проверки и общий помощник для cookie
+
+`verify-live.mjs` отвечает на то, на что не отвечает `tools/boot-check.mjs`:
+действительно ли отдаваемый бандл несёт переводы и отвечает ли роут промпта
+той формой, что описана в его README. Он воспроизводит строки 7, 12 и 18 из
+[`docs/VERIFICATION.ru.md`](../../docs/VERIFICATION.ru.md) прямо из свежего
+клона — раньше эта таблица ссылалась на разовые скрипты вне репозитория.
+
+И он, и `boot-check.mjs` выпускают cookie браузерной сессии через
+`tools/lib/session-cookie.mjs`, поэтому работа с этим секретом имеет один
+источник истины. Секрет читается из `$DSH_HOME` и нигде не печатается.
+
+`scan-secrets.mjs` превращает утверждение «секретов нет» из заявления в
+проверяемый факт. Он падает на форме ключа, на попавшем в git `.env` и — на
+самом важном случае — на секрете, который закоммитили, а потом удалили: блоб
+всё ещё лежит в базе объектов. Недостижимые блобы тоже сканируются, потому что
+`git push --mirror` отправил бы и их. Без git он сообщает `PARTIAL` и выходит с
+кодом 2, а не заявляет чистый результат, которого не устанавливал.
 
 ### Юнит-тесты и пакеты DSH
 
@@ -100,8 +147,14 @@ node tools/dev/test-host.mjs
 ```
 
 Ссылка появляется в `node_modules/`, который git игнорирует. Для
-`test-client.mjs`, `test-locale-ru.mjs` и `test-links.mjs` она не нужна — как и
-для установки и использования самих модов.
+`test-client.mjs`, `test-locale-ru.mjs`, `test-links.mjs` и `scan-secrets.mjs`
+она не нужна — как и для установки и использования самих модов.
+
+`test-host.mjs` ещё и пишет на диск: он направляет `DSH_HOME` в
+`tools/dev/_testhome-host/`, очищает его и даёт host-половине создать там свой
+файл состояния. Каталог лежит внутри репозитория, но подпадает под правило
+`_testhome*/` в [`.gitignore`](../../.gitignore), поэтому в `git status` не
+появляется.
 
 ### Проверка ссылок
 
