@@ -19,7 +19,7 @@ troubleshooting table at the end covers what can go wrong.
 3. **Starting your own `dsh web` is fine; restarting the user's is not.** To
    verify an installation, boot a second server on a free port under your own
    `DSH_HOME` — that never touches theirs, and it is how every check below was
-   validated.
+   validated. The exact command is in Step 4.
 4. **Never commit or print credentials.** `$DSH_HOME/.credentials.yaml` holds
    API keys and the browser-session signing secret.
 5. **Verify, don't assume.** Every claim below is checkable with a command.
@@ -73,8 +73,13 @@ If you need a preview first, `--dry-run` reports without writing.
 
 ## Step 3 — make the running GUI pick it up
 
-The **host** half of a newly inserted row is loaded live when the patch file
-changes. The **browser** half enters the roster when the page loads, so:
+If **no** server is running yet — a home that has never booted has none — there
+is nothing to reload: start one as shown in Step 4 and it will serve both mods
+on its first page load.
+
+When a server *is* running: the **host** half of a newly inserted row is loaded
+live when the patch file changes, and the **browser** half enters the roster
+when the page loads, so:
 
 - **Reload the page (F5)** — enough when DSH is already running and the row is
   new.
@@ -85,11 +90,31 @@ changes. The **browser** half enters the roster when the page loads, so:
 
 ## Step 4 — verify
 
-With `dsh web` running:
+`boot-check` needs a running server. If the user already has one, use its URL.
+Otherwise start your **own** — a second server, on a free port, in your own home;
+the user's server and home are left alone:
+
+```powershell
+# 1. find the launcher; the `dsh` shim may be blocked by execution policy
+$launcher = (Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js |
+  Where-Object FullName -like '*@deepseek-ai\dsh*' | Select-Object -First 1).FullName
+
+# 2. a scratch home, so the user's is untouched
+$env:DSH_HOME = "$env:TEMP\dsh-mod-check"
+
+# 3. boot on a free port; --no-open keeps the default browser closed
+node $launcher web --no-open --port 3088
+```
+
+The first boot creates whatever the home is missing — the profile files,
+`storages/`, `.credentials.yaml` — and leaves `cordis.patch.yml` untouched. Run
+it in the background or a second shell; it serves until you stop it.
+
+Then:
 
 ```bash
 node tools/boot-check.mjs                       # defaults to http://127.0.0.1:3080
-node tools/boot-check.mjs http://127.0.0.1:3081 # another port
+node tools/boot-check.mjs http://127.0.0.1:3088 # the server you just started
 ```
 
 Expected:
@@ -112,9 +137,11 @@ the language pack carries translations. Two cheap extra checks close that gap:
 - the route answers when the host half is live:
   `GET /api/system-prompt.mod` — its full contract is in
   [the package README](../packages/system-prompt-mod/README.md#http-contract);
-- open a session and click **Промпт** — the dialog lists the current prompt
-  (7041 characters on a fresh install). An error line there means the route
-  answered but the prompt assembly failed, which is a different problem.
+- open a session and click **Промпт** — the dialog lists the current prompt. The
+  length depends on the deployment prompt and the preset layers, so do not
+  compare it against a number from another machine; what matters is that a
+  prompt appears at all. An error line instead means the route answered but the
+  prompt assembly failed, which is a different problem.
 
 Manual equivalent: open the GUI and check that
 
@@ -136,7 +163,7 @@ Tell the user exactly:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `dsh` is not found at all | DSH was installed through npx and never linked onto `PATH` | find its launcher and call it with node: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web` |
-| `dsh` fails with `…dsh.ps1 cannot be loaded because running scripts is disabled on this system` | PowerShell execution policy blocks the shim on Windows | call `lib/bin.js` with node as above, or allow signed scripts once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `dsh` fails with `…dsh.ps1 cannot be loaded because running scripts is disabled on this system` | PowerShell execution policy blocks the shim on Windows | **Do not change the machine's security policy on your own.** Call the launcher directly instead: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web --no-open --port <free port>`. Widening the policy (`Set-ExecutionPolicy …`) is a machine-wide change the *user* may choose to make, not a step in this runbook |
 | `boot-check` prints `cannot read the browser-session secret` | the home has never booted, so it has no `.credentials.yaml` yet | start `dsh web` once against that home, then re-run the probe |
 | `boot-check` prints `cannot reach …` | `dsh web` is not running, or a different port | start it, or pass the right URL |
 | `boot-check` prints `the derived cookie was refused` | wrong Harness home (the secret belongs to another install) | set `DSH_HOME` to the home the running server uses |

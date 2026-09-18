@@ -32,6 +32,8 @@ with `{{model}}`, `{{cwd}}` and preset layers already resolved.*
 
 - **DeepSeek Harness** installed and able to run `dsh web`. Tested against **0.1.5-rc.2**.
 - **Node.js** — the same runtime DSH itself runs on.
+- **git**, to clone (skip it and download the ZIP instead — the installer does
+  not need git).
 - No build step, no compiler, no network access at install time.
 
 The mods are plain JavaScript packages. DSH is pre-1.0 and its plugin API moves
@@ -54,9 +56,15 @@ loads.
 That is the whole installation. The script copies both packages into
 `$DSH_HOME/profiles/node_modules/@local/` (default `~/.dsh`) and adds one loader
 row per package to `$DSH_HOME/profiles/web/cordis.patch.yml`, leaving any
-existing content in that file untouched. It is **idempotent**: run it again and
-it reports that everything is already in place. It also snapshots the packages
-and the mod state into `$DSH_HOME/mod-backups/<timestamp>/` first.
+existing content in that file untouched.
+
+Re-running is safe and, when nothing changed, a genuine no-op: a package whose
+installed copy already matches this checkout is left alone, the rows are checked
+without duplication, and no backup is written. When an installed package
+*differs* — you pulled a new version — that package is replaced and the previous
+copy plus the mod state is snapshotted into
+`$DSH_HOME/mod-backups/<timestamp>/` first, which is what makes a rollback
+possible.
 
 Options:
 

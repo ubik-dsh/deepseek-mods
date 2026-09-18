@@ -20,6 +20,7 @@
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,10 +48,12 @@ const MESSAGES = {
     home: 'DSH home',
     discovered: (count) => `discovered ${count} package(s) in packages/`,
     installed: (name, path) => `installed ${name} -> ${path}`,
+    unchanged: (name) => `${name} is already up to date`,
     skipped: (name) => `SKIPPED ${name}: no package.json`,
     backupState: (path) => `backed up ${path}`,
     backupPackages: (path) => `backed up the packages -> ${path}`,
     backupEmpty: 'nothing to back up yet (the mods own no state on this machine)',
+    backupNothingChanged: 'nothing to back up: the installed packages already match this checkout',
     rowsPresent: (label) => `${label}: every row is already present`,
     rowsAdded: (label, ids) => `${label}: added rows ${ids}`,
     dryRun: 'dry run: nothing was written',
@@ -65,10 +68,12 @@ const MESSAGES = {
     home: 'Домашний каталог DSH',
     discovered: (count) => `найдено пакетов в packages/: ${count}`,
     installed: (name, path) => `установлен ${name} -> ${path}`,
+    unchanged: (name) => `${name} уже актуален`,
     skipped: (name) => `ПРОПУЩЕН ${name}: нет package.json`,
     backupState: (path) => `сохранён в бэкап: ${path}`,
     backupPackages: (path) => `пакеты скопированы в бэкап -> ${path}`,
     backupEmpty: 'состояния модов пока нет — бэкапить нечего',
+    backupNothingChanged: 'бэкапить нечего: установленные пакеты уже совпадают с этим репозиторием',
     rowsPresent: (label) => `${label}: все строки уже на месте`,
     rowsAdded: (label, ids) => `${label}: добавлены строки ${ids}`,
     dryRun: 'пробный запуск: ничего не записано',
@@ -109,6 +114,39 @@ function discoverPackages() {
 }
 
 const packages = discoverPackages()
+
+/**
+ * Content digest of every file under `dir`, so that two trees can be compared
+ * without trusting timestamps or sizes alone.
+ * @param dir - directory to digest.
+ * @returns one hex digest covering every relative path and file content.
+ */
+function treeDigest(dir) {
+  const entries = []
+  const walk = (current, prefix) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name))) {
+      const full = join(current, entry.name)
+      const relative = prefix === '' ? entry.name : `${prefix}/${entry.name}`
+      if (entry.isDirectory()) walk(full, relative)
+      else if (entry.isFile()) {
+        entries.push(`${relative}:${createHash('sha256').update(readFileSync(full)).digest('hex')}`)
+      }
+    }
+  }
+  walk(dir, '')
+  return createHash('sha256').update(entries.join('\n')).digest('hex')
+}
+
+/** Whether an installed package already matches the one in the repository. */
+function sameTree(left, right) {
+  try {
+    return treeDigest(left) === treeDigest(right)
+  } catch {
+    return false
+  }
+}
+
 say(`${t.home}: ${home}`)
 say(t.discovered(packages.length))
 for (const entry of packages) say(`  - ${entry.package} (row id: ${entry.id})`)
@@ -160,16 +198,20 @@ if (UNINSTALL) {
   process.exit(0)
 }
 
-// ── 1. back up what a re-install could otherwise destroy ───────────────────
+// ── 1. work out what actually changes, and back up what that would destroy ─
 //
-// Only a machine that already has these packages has something to preserve. On
-// a first install this step is skipped, so a stranger's clean home does not
-// collect a `mod-backups` copy of what it is installing — and repeated runs do
-// not fill the home with dated snapshots of the same files.
+// Re-running must be a true no-op: a package whose installed copy is
+// byte-identical to the one in the repository is left alone, and nothing is
+// snapshotted. Only a package that is absent or *different* is installed, and
+// only a different one has a previous state worth preserving.
 const target = join(home, 'profiles', 'node_modules', '@local')
-const previous = packages.filter((entry) => existsSync(join(target, entry.directory)))
+const installed = packages.filter((entry) => existsSync(join(target, entry.directory)))
+const unchanged = installed.filter((entry) => sameTree(join(target, entry.directory), join(PACKAGES_DIR, entry.directory)))
+const stale = installed.filter((entry) => !unchanged.includes(entry))
+const toInstall = packages.filter((entry) => !unchanged.includes(entry))
+
 const backupDir = join(home, 'mod-backups', new Date().toISOString().replace(/[:.]/gu, '-').slice(0, 19))
-const backedUp = !DRY_RUN && previous.length > 0
+const backedUp = !DRY_RUN && stale.length > 0
 if (backedUp) {
   mkdirSync(backupDir, { recursive: true })
   for (const file of STATE_FILES) {
@@ -177,13 +219,13 @@ if (backedUp) {
     cpSync(file, join(backupDir, file.split(/[\\/]/u).pop()))
     say(t.backupState(file))
   }
-  for (const entry of previous) {
+  for (const entry of stale) {
     // The installed copy is what the next step overwrites.
     cpSync(join(target, entry.directory), join(backupDir, 'packages', entry.directory), { recursive: true })
   }
   say(t.backupPackages(join(backupDir, 'packages')))
 } else if (!DRY_RUN) {
-  say(t.backupEmpty)
+  say(stale.length === 0 && unchanged.length > 0 ? t.backupNothingChanged : t.backupEmpty)
 }
 
 if (BACKUP_ONLY) {
@@ -200,6 +242,10 @@ for (const entry of packages) {
     continue
   }
   const destination = join(target, entry.directory)
+  if (!toInstall.includes(entry)) {
+    say(t.unchanged(entry.package))
+    continue
+  }
   if (DRY_RUN) {
     say(t.installed(entry.package, destination))
     continue

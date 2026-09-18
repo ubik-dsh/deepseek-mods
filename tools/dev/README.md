@@ -33,6 +33,24 @@ The link lands in `node_modules/`, which git ignores. It is not needed for
 `test-client.mjs` or `test-locale-ru.mjs`, and never for installing or using the
 mods.
 
+### The browser checks
+
+`ui-check.mjs` and `ui-locale.mjs` drive a headless Edge over the DevTools
+Protocol, so they need Windows, Edge, and a running `dsh web`. What they assume:
+
+| | Value |
+|---|---|
+| server | `http://127.0.0.1:3080` unless you pass a URL as the first argument |
+| Harness home | `$DSH_HOME`, else `~/.dsh` — they read its browser-session secret |
+| screenshots | `%TEMP%\dsh-mod-shots` (override with `DSH_SHOTS`), so a run never dirties the checkout |
+| Edge profile | a throwaway directory next to the script, removed at start and left after the run |
+
+Start your own server for them if you would rather not touch a live one — the
+launch recipe is in [`docs/AI-INSTALL.md`](../../docs/AI-INSTALL.md) Step 4.
+
+`restart-web.mjs` and `verify-live.ps1` carry machine-specific paths and ports;
+read them before use.
+
 The absolute paths inside `ui-check.mjs`, `ui-locale.mjs`, `restart-web.mjs`,
 `picker-extract.mjs` and `verify-live.ps1` are machine-specific: edit them before
 reuse. The installer and the builders under `tools/` take no absolute paths.
@@ -73,7 +91,20 @@ node tools/dev/test-host.mjs
 `test-client.mjs` и `test-locale-ru.mjs` она не нужна — как и для установки и
 использования самих модов.
 
-Абсолютные пути внутри `ui-check.mjs`, `ui-locale.mjs`, `restart-web.mjs`,
-`picker-extract.mjs` и `verify-live.ps1` привязаны к конкретной машине: перед
-повторным использованием их надо поправить. Установщик и сборщики в `tools/`
-абсолютных путей не содержат.
+### Браузерные проверки
+
+`ui-check.mjs` и `ui-locale.mjs` управляют headless Edge по DevTools Protocol,
+поэтому им нужны Windows, Edge и запущенный `dsh web`. Что они предполагают:
+
+| | Значение |
+|---|---|
+| сервер | `http://127.0.0.1:3080`, если не передать URL первым аргументом |
+| домашний каталог | `$DSH_HOME`, иначе `~/.dsh` — оттуда берётся секрет браузерной сессии |
+| скриншоты | `%TEMP%\dsh-mod-shots` (переопределяется через `DSH_SHOTS`), поэтому запуск не пачкает репозиторий |
+| профиль Edge | временный каталог рядом со скриптом: чистится при старте, остаётся после запуска |
+
+Если не хочется трогать живой сервер — подними свой: рецепт запуска в
+[`docs/AI-INSTALL.ru.md`](../../docs/AI-INSTALL.ru.md), шаг 4.
+
+`restart-web.mjs` и `verify-live.ps1` содержат машинно-зависимые пути и порты —
+читай их перед использованием.

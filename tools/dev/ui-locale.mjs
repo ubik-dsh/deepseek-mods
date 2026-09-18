@@ -8,7 +8,7 @@
 import { createHash, createHmac } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -16,7 +16,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 const base = process.argv[2] ?? 'http://127.0.0.1:3080'
 const authority = new URL(base).host
 const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-const shots = join(here, 'shots')
+// Screenshots land outside the checkout by default, so running a check never
+// dirties the repository. Override with DSH_SHOTS to keep them where you like.
+const shots = process.env.DSH_SHOTS ?? join(tmpdir(), 'dsh-mod-shots')
 mkdirSync(shots, { recursive: true })
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
