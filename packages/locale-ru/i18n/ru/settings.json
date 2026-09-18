@@ -1,0 +1,14 @@
+{
+ "trigger": "Настройки",
+ "title": "Настройки",
+ "close": "Закрыть",
+ "openDocument": "Открыть файл конфигурации",
+ "openDocument.error": "Не удалось открыть файл конфигурации",
+ "general.nav": "Общие",
+ "connection.error": "Отключено",
+ "connection.retry": "Переподключиться сейчас",
+ "connection.connecting": "Переподключение",
+ "connection.connected": "Подключено",
+ "connection.reconnect": "Отключено, переподключиться сейчас",
+ "connection.restart": "Автоматическое переподключение, переподключиться сейчас"
+}

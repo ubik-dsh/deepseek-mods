@@ -1,0 +1,12 @@
+{
+ "section.files": "Файлы и папки",
+ "section.sessions": "Сессии",
+ "candidate.noCwd": "(нет рабочего каталога)",
+ "crumb.root": "Рабочее пространство",
+ "time.now": "сейчас",
+ "time.minutes": "{n} мин",
+ "time.hours": "{n} ч",
+ "time.days": "{n} дн",
+ "time.months": "{n} мес",
+ "time.years": "{n} г"
+}

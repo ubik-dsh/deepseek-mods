@@ -1,0 +1,26 @@
+# Dependencies and links — never commit these.
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# Personal data: a DSH home backup holds settings.yaml and the prompt override.
+mod-backups/
+backup/
+*.credentials.yaml
+.credentials.yaml
+settings.yaml
+system-prompt-mod.json
+
+# Verification harness artefacts.
+_edge-profile*/
+_testhome*/
+shots/
+*.log
+locale-en.json
+
+# Editor and OS noise.
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,34 @@
+{
+  "name": "@local/dsh-system-prompt-mod",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dual-face DSH plugin: a chat-header button that shows the live system prompt, edits it, and applies an override without a restart",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "README.md",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-system-prompt": "^0.1.5-rc.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

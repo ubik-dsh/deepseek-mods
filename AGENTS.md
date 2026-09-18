@@ -1,0 +1,70 @@
+# Agent instructions
+
+This repository contains **mods (plugins) for DeepSeek Harness (DSH)**. If you
+are an AI agent working here, read this first.
+
+## What you are working with
+
+- `packages/system-prompt-mod/` — a dual-face plugin (host + browser): a chat
+  header control that shows and edits the live system prompt.
+- `packages/locale-ru/` — a browser-only plugin: the Russian language pack.
+- `tools/` — installer, verifier, builders. No absolute paths.
+- `tools/dev/` — development and verification harness. **Machine-specific paths
+  live here**; the Windows/Edge scripts are not portable.
+
+## Task-specific guides
+
+| The user asks for | Read |
+|---|---|
+| "install these mods" | [`docs/AI-INSTALL.md`](docs/AI-INSTALL.md) (RU: `docs/AI-INSTALL.ru.md`) |
+| "make me a mod" | [`docs/AI-PROMPT.md`](docs/AI-PROMPT.md) (RU: `docs/AI-PROMPT.ru.md`) |
+| "how do I publish this" | [`docs/PUBLISH.md`](docs/PUBLISH.md) |
+
+## Rules that override convenience
+
+1. **Never edit the DSH installation.** Mods are separate packages installed into
+   the Harness home (`$DSH_HOME`, default `~/.dsh`).
+2. **Never restart the user's `dsh web` process unasked**, and never kill the
+   process you are running inside. A changed package file needs a restart to
+   take effect — hand the user the command.
+3. **Never commit or print secrets.** `$DSH_HOME/.credentials.yaml` holds API
+   keys and the browser-session signing secret.
+4. **Verify with evidence.** Run `node tools/boot-check.mjs` (needs a running
+   `dsh web`) or a unit test; do not report success from reading code.
+5. **Keep both languages in sync.** Every user-facing document exists as
+   `X.md` (English) and `X.ru.md` (Russian).
+
+## Cheat sheet
+
+```bash
+node tools/install.mjs                 # install every package in packages/
+node tools/install.mjs --dry-run       # preview
+node tools/install.mjs --uninstall     # remove packages and their rows
+node tools/boot-check.mjs              # is each mod in the served boot graph?
+node tools/build-locale.mjs            # rebuild the language bundle from i18n/
+node tools/extract-locale.mjs          # re-read dictionaries from a DSH install
+node tools/dev/link-dsh.mjs            # make @deepseek-ai/* resolvable for tests
+node tools/dev/test-host.mjs           # prompt mod, host half
+node tools/dev/test-client.mjs         # prompt mod, browser bundle
+node tools/dev/test-locale-ru.mjs      # language pack contract
+```
+
+## Editing cautions
+
+- `packages/locale-ru/lib/client.js` is **generated**. Edit
+  `packages/locale-ru/i18n/ru/*.json` and rebuild.
+- The browser bundles are hand-written in the lazy-CJS form
+  `window.__ModuleLoader__.load({ id, factory })`. `id` must equal the package
+  name. Only nine baseline modules may be `require`d — see
+  [`docs/AI-PROMPT.md`](docs/AI-PROMPT.md) Phase 3.
+- On Windows, PowerShell 5.1 corrupts UTF-8 when a script does
+  `Get-Content -Raw` + `Set-Content`. Use a UTF-8-aware tool and verify the
+  encoding after any bulk rewrite.
+
+---
+
+Кратко по-русски: это репозиторий модов для DSH. Не правь установку DSH, не
+перезапускай `dsh web` без разрешения, не коммить секреты, проверяй результат
+командой `tools/boot-check.mjs`, держи документацию на двух языках.
+Инструкция по установке — `docs/AI-INSTALL.ru.md`, по созданию мода —
+`docs/AI-PROMPT.ru.md`.

@@ -1,0 +1,7 @@
+{
+ "title": "Image",
+ "preview": "Image preview: {name}",
+ "loading": "Opening image…",
+ "failed": "This image could not be displayed.",
+ "unsupported": "Image preview requires the complete file contents."
+}

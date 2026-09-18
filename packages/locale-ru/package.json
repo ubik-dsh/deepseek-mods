@@ -1,0 +1,29 @@
+{
+  "name": "@local/dsh-locale-ru",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Russian language pack for the DSH Web GUI: registers the ru locale and Russian dictionaries for every shipped client namespace",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "i18n",
+    "README.md",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}
