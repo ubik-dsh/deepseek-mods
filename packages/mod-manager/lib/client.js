@@ -74,7 +74,8 @@ window.__ModuleLoader__.load({
 			orphans: "Packages with no loader row",
 			orphansHint: "Present under @local/ but no patch layer mounts them, so nothing loads them.",
 			backups: "Snapshots",
-			noteLive: "Turning a mod off or on takes effect in the running server without a restart. Changing a mod's files does not — that needs a restart of dsh web.",
+			noteLive: "Turning a mod off or on, and removing it, take effect at once — no reload and no restart. Installing a new mod needs the page reloaded (F5) so the browser fetches its bundle; updating one needs `dsh web` restarted, because the running server keeps the build it started with.",
+			noteRefresh: "This list re-reads itself when you come back to this window, so a mod installed from a terminal shows up without pressing anything.",
 			noteScope: "Only @local/ packages are managed here, and this panel never turns itself off. Shipped DSH plugins are untouched.",
 			busy: "Working…",
 			okDisabled: "Turned off.",
@@ -131,7 +132,8 @@ window.__ModuleLoader__.load({
 			orphans: "Пакеты без строки загрузчика",
 			orphansHint: "Лежат в @local/, но ни один слой патча их не монтирует — значит, ничто их не загружает.",
 			backups: "Снапшоты",
-			noteLive: "Выключение и включение мода применяется в работающем сервере без перезапуска. А изменение файлов мода — нет: для этого нужен перезапуск dsh web.",
+			noteLive: "Выключение и включение мода, а также удаление, действуют сразу — без перезагрузки и перезапуска. Установка нового мода требует обновить страницу (F5), чтобы браузер забрал его бандл; обновление уже установленного — перезапуска `dsh web`, потому что сервер держит сборку, с которой запустился.",
+			noteRefresh: "Этот список перечитывается сам, когда вы возвращаетесь в окно, поэтому мод, установленный из терминала, появляется без нажатий.",
 			noteScope: "Здесь управляются только пакеты @local/, и панель никогда не выключает сама себя. Штатные плагины DSH не затрагиваются.",
 			busy: "Работаю…",
 			okDisabled: "Выключен.",
@@ -380,6 +382,34 @@ window.__ModuleLoader__.load({
 				load();
 			}, [load]);
 
+			/**
+			 * Re-read when the window comes back to the front.
+			 *
+			 * That is exactly when something changed outside this panel: a mod
+			 * installed from a terminal, a patch file edited by hand. Waiting to be
+			 * asked would leave a stale list, and polling would spend requests on
+			 * nothing; returning to the window is the moment the answer matters.
+			 */
+			react.useEffect(() => {
+				const view = typeof window === "undefined" ? null : window;
+				if (view === null || typeof view.addEventListener !== "function") return undefined;
+				const onReturn = () => {
+					if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+					load();
+				};
+				view.addEventListener("focus", onReturn);
+				const doc = typeof document === "undefined" ? null : document;
+				if (doc !== null && typeof doc.addEventListener === "function") {
+					doc.addEventListener("visibilitychange", onReturn);
+				}
+				return () => {
+					view.removeEventListener("focus", onReturn);
+					if (doc !== null && typeof doc.removeEventListener === "function") {
+						doc.removeEventListener("visibilitychange", onReturn);
+					}
+				};
+			}, [load]);
+
 			const run = (payload, okKey) => {
 				setBusy(true);
 				setNotice(null);
@@ -553,6 +583,7 @@ window.__ModuleLoader__.load({
 			if (state !== null) {
 				body.push(h("div", { style: styles.notes, key: "notes" },
 					h("div", null, t("noteLive")),
+					h("div", null, t("noteRefresh")),
 					h("div", null, t("noteScope")),
 					h("div", null, `${t("backups")}: ${String(state.backupRoot)}`)));
 			}

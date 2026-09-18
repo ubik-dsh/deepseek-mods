@@ -18,6 +18,20 @@ Clicking the tag is the control: it turns the mod off or on. The chevron opens
 the card, where the details and the destructive action live, so nothing
 irreversible sits under the cursor of someone scanning the list.
 
+## When a reload is needed, and when it is not
+
+| Change | What it takes |
+|---|---|
+| Turning a mod off or on from this panel | nothing — it applies to the running server at once |
+| Removing a mod from this panel | nothing — its rows leave the patch file while the server runs |
+| Installing a **new** mod | reload the page (F5), so the browser fetches its bundle |
+| Updating an already-installed mod | restart `dsh web`: the running server keeps the build it started with |
+
+The list re-reads itself whenever the window comes back to the front — which is
+exactly when something changed outside it, such as a mod installed from a
+terminal. The **Refresh** button is there for when you would rather not switch
+windows to trigger that.
+
 ## What it shows
 
 For every patch layer — the home layer and each profile — the rows it declares,

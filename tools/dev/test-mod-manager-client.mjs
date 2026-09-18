@@ -24,7 +24,19 @@ const source = readFileSync(join(REPO, 'packages', 'mod-manager', 'lib', 'client
 
 /** Rows the bundle registered through `window.__ModuleLoader__.load`. */
 const rows = []
-const fakeWindow = { __ModuleLoader__: { load: (row) => rows.push(row) } }
+const fakeWindow = {
+  __ModuleLoader__: { load: (row) => rows.push(row) },
+  // Captured so the panel's "re-read when the window comes back" can be driven.
+  addEventListener: (name, fn) => {
+    if (!(name in windowListeners)) windowListeners[name] = []
+    windowListeners[name].push(fn)
+  },
+  removeEventListener: (name, fn) => {
+    windowListeners[name] = (windowListeners[name] ?? []).filter((entry) => entry !== fn)
+  },
+}
+/** Handlers the panel registered on `window`, by event name. */
+const windowListeners = {}
 new Function('window', source)(fakeWindow)
 assert.equal(rows.length, 1, 'the bundle registers exactly one module row')
 const row = rows[0]
@@ -180,6 +192,9 @@ globalThis.location = { origin: 'http://127.0.0.1:3080' }
 globalThis.confirm = () => true
 globalThis.document = {
   documentElement: { lang: 'ru' },
+  visibilityState: 'visible',
+  addEventListener: () => {},
+  removeEventListener: () => {},
   querySelectorAll: () => [{
     getAttribute: () => '/plugins/??@local/dsh-locale-ru/client.js,@local/dsh-mod-manager/client.js&rev=abc',
   }],
@@ -444,6 +459,25 @@ try {
   assert.ok(english.includes('Off'), 'and phrases the turned-off tag in its own words')
   assert.ok(english.includes('On'), 'as well as the enabled one')
   console.log('ok 13. falls back to its own dictionary per document language')
+
+  // 14. the panel re-reads itself when the window comes back
+  globalThis.document = {
+    documentElement: { lang: 'ru' },
+    visibilityState: 'visible',
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    querySelectorAll: () => [{
+      getAttribute: () => '/plugins/??@local/dsh-locale-ru/client.js&rev=abc',
+    }],
+  }
+  react.__reset()
+  registered.component({})
+  assert.ok((windowListeners.focus ?? []).length > 0, 'the panel listens for the window coming back')
+  requests.length = 0
+  for (const handler of windowListeners.focus ?? []) handler()
+  await tick()
+  assert.equal(requests.length, 1, 'returning to the window re-reads the host, without being asked')
+  console.log('ok 14. re-reads itself when the window comes back')
 
   console.log('')
   console.log('PASS — mod-manager browser bundle verified')
