@@ -3,6 +3,8 @@
 Plugins for **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** (DSH) — the
 agent harness whose browser UI is the `dsh web` GUI.
 
+> **Repository:** <https://gitverse.ru/ubikon/dsh-mods>
+
 Two mods live here:
 
 | Mod | What it does |
@@ -38,10 +40,13 @@ quickly, so read [Compatibility](#compatibility) before upgrading DSH.
 ## Install
 
 ```bash
-git clone <this-repository> dsh-mods
+git clone https://gitverse.ru/ubikon/dsh-mods.git dsh-mods
 cd dsh-mods
 node tools/install.mjs
 ```
+
+That URL is the repository's home. A clone from any mirror or fork works the
+same — nothing in the project depends on where it was cloned from.
 
 Then **reload the Web GUI (F5)** — the browser roster is composed when the page
 loads.

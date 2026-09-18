@@ -3,6 +3,8 @@
 Плагины для **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** (DSH) —
 харнесса агентов, браузерный интерфейс которого открывает команда `dsh web`.
 
+> **Репозиторий:** <https://gitverse.ru/ubikon/dsh-mods>
+
 В репозитории два мода:
 
 | Мод | Что делает |
@@ -39,10 +41,13 @@
 ## Установка
 
 ```bash
-git clone <этот-репозиторий> dsh-mods
+git clone https://gitverse.ru/ubikon/dsh-mods.git dsh-mods
 cd dsh-mods
 node tools/install.mjs
 ```
+
+Это домашний адрес репозитория. Клон из зеркала или форка работает точно так же
+— в проекте ничто не зависит от того, откуда его склонировали.
 
 Затем **обнови страницу Web-GUI (F5)** — браузерный ростер собирается при
 загрузке страницы.

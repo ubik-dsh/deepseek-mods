@@ -6,6 +6,11 @@ This repository is ready to publish as-is. Nothing in it is machine-specific:
 the installer and the builders take no absolute paths, and no personal data,
 credentials, or backups are tracked (see [`.gitignore`](../.gitignore)).
 
+**This copy lives at <https://gitverse.ru/ubikon/dsh-mods>** (private at the time
+of writing). The commands below stay generic — `<user>` and `<host>` are
+placeholders on purpose, so the guide works for GitHub, GitVerse, or any other
+host, and for anybody publishing a fork.
+
 ## 1. Install git
 
 ```powershell
