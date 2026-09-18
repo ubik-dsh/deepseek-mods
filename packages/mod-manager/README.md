@@ -7,6 +7,17 @@ turn a mod off, turn it back on, or remove it.
 It is how you manage mods without a terminal — and without guessing whether a
 restart is needed.
 
+## The cards are the platform's own
+
+Each mod is a card in the format the shipped plugin inventory already uses, built
+from the same components: the platform's `Tag` and `StateDot`. A mod therefore
+reads **green when it is on** and **red when it is off**, the way every other
+plugin in DSH reads — not a private look-alike.
+
+Clicking the tag is the control: it turns the mod off or on. The chevron opens
+the card, where the details and the destructive action live, so nothing
+irreversible sits under the cursor of someone scanning the list.
+
 ## What it shows
 
 For every patch layer — the home layer and each profile — the rows it declares,

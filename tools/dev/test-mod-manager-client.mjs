@@ -31,7 +31,12 @@ const row = rows[0]
 assert.equal(row.id, '@local/dsh-mod-manager', 'the row id is the package name')
 
 // ── stubs ──────────────────────────────────────────────────────────────────
-const VALID_PRIMITIVES = new Set(['Button', 'Modal', 'Switch', 'Tag', 'IconPersonalizationOutline16'])
+const VALID_PRIMITIVES = new Set([
+  'Button', 'Modal', 'Switch', 'Tag', 'IconPersonalizationOutline16',
+  // The official card vocabulary: the shipped plugin inventory builds its rows
+  // from exactly these, which is what lets this panel match it.
+  'StateDot', 'IconChevronDownOutline14',
+])
 
 /**
  * React stub that honours hook dependencies.
@@ -215,6 +220,32 @@ const buttonsOf = (node, out = []) => {
   return out
 }
 
+/** Every node a predicate accepts, anywhere in a rendered tree. */
+const findNodes = (node, accept, out = []) => {
+  if (node === null || node === undefined || typeof node !== 'object') return out
+  if (Array.isArray(node)) {
+    for (const child of node) findNodes(child, accept, out)
+    return out
+  }
+  if (accept(node)) out.push(node)
+  if (node.props !== undefined) findNodes(node.props.children, accept, out)
+  return out
+}
+
+/** Card headers: the clickable row that opens a card's details. */
+const headersOf = (tree) =>
+  findNodes(tree, (n) => n.props?.role === 'button' && 'aria-expanded' in (n.props ?? {}))
+
+/** The enablement tag controls: `role=button` wrappers that are not headers. */
+const togglesOf = (tree) =>
+  findNodes(tree, (n) => n.props?.role === 'button' && !('aria-expanded' in (n.props ?? {})))
+
+/** The status tags, in render order. */
+const tagsOf = (tree) => findNodes(tree, (n) => n.type === 'Tag')
+
+/** React synthetic events need `stopPropagation`; the panel calls it guarded. */
+const click = () => ({ stopPropagation() {} })
+
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 try {
@@ -290,33 +321,35 @@ try {
   assert.ok(text.includes('Установленные моды'), 'the panel renders its heading in Russian')
   assert.ok(text.includes('@local/dsh-locale-ru'), 'it lists the installed mod')
   assert.ok(text.includes('profile web'), 'it lists each patch layer')
-  assert.ok(text.includes('id: locale-ru'), 'it shows the row id')
+  assert.ok(text.includes('locale-ru'), 'it shows the row id')
   console.log('ok  5. renders the mods and layers from the host snapshot')
 
-  // 6. the two facts are kept apart
-  assert.ok(text.includes('на диске'), 'an installed package is marked as on disk')
-  assert.ok(text.includes('нет на диске'), 'a row without a package is marked as missing')
-  assert.ok(text.includes('отдан этой странице'), 'it reports what the page was served')
-  console.log('ok  6. shows on-disk and served state separately')
+  // 6. every mod is a card in the official format
+  assert.equal(headersOf(tree).length, 4, 'one card per loader row, across both layers')
+  assert.deepEqual(
+    tagsOf(tree).map((node) => node.props.tone),
+    ['success', 'warning', 'success', 'danger'],
+    'green for on, warning for a row with no package, red for off',
+  )
+  assert.ok(tagsOf(tree).some((node) => node.props.children === 'Включён'), 'an enabled mod reads Включён')
+  assert.ok(tagsOf(tree).some((node) => node.props.children === 'Выключен'), 'a disabled mod reads Выключен')
+  console.log('ok  6. renders official-style cards with success/warning/danger tones')
 
   // 7. served detection follows what the page actually requested
-  const renderText = () => {
+  const dotStates = () => {
     react.__reset()
-    return stringsOf(registered.component({})).join(' | ')
+    return findNodes(registered.component({}), (node) => node.type === 'StateDot').map((node) => node.props.state)
   }
-  // a) the DOM carries the boot-graph request
-  assert.ok(renderText().includes('отдан этой странице'), 'a mod in the script tag reads as served')
-  // b) the request has left the DOM but is still in the resource timeline
+  assert.ok(dotStates().includes('done'), 'a mod this page was served shows the done dot')
   globalThis.document = { documentElement: { lang: 'ru' }, querySelectorAll: () => [] }
   globalThis.performance = {
     getEntriesByType: () => [{ name: 'http://127.0.0.1:3080/plugins/??@local/dsh-locale-ru/client.js&rev=abc' }],
   }
-  const viaTimeline = renderText()
-  assert.ok(viaTimeline.includes('отдан этой странице'), 'the resource timeline alone is enough to read as served')
-  // c) neither source mentions it
+  assert.ok(dotStates().includes('done'), 'the resource timeline alone is enough to read as served')
   globalThis.performance = { getEntriesByType: () => [] }
-  assert.ok(renderText().includes('не отдан здесь'), 'with no boot graph at all, nothing reads as served')
-  // back to the normal state
+  const noServed = dotStates()
+  assert.ok(!noServed.includes('done'), 'with no boot graph at all, nothing reads as served')
+  assert.ok(noServed.includes('idle'), 'and the dot falls back to its idle state')
   globalThis.document = {
     documentElement: { lang: 'ru' },
     querySelectorAll: () => [{
@@ -325,21 +358,26 @@ try {
   }
   console.log('ok  7. served state comes from the boot graph the page requested')
 
-  // 8. action set follows the row's real state
+  // 8. a card opens its details, and its tag is the control
   react.__reset()
   tree = registered.component({})
-  const turnOff = buttonsOf(tree).filter((node) => node.props.children === 'Выключить')
-  const turnOn = buttonsOf(tree).filter((node) => node.props.children === 'Включить')
-  assert.equal(turnOff.length, 2, 'both rows present in the patch file offer Turn off, including the one missing on disk')
-  assert.equal(turnOn.length, 1, 'the turned-off row is still listed, and offers Turn on')
-  assert.ok(stringsOf(tree).join(' | ').includes('выключен'), 'a turned-off row is marked as such')
-  assert.ok(!stringsOf(tree).join(' | ').includes('@local/dsh-mod-manager | id: mods | эта панель | не управляется'), 'the manager row carries no actions')
-  console.log('ok  8. the panel offers Turn off, Turn on and no self-management by row state')
+  assert.equal(headersOf(tree)[0].props['aria-expanded'], false, 'cards start closed')
+  headersOf(tree)[0].props.onClick()
+  react.__reset()
+  tree = registered.component({})
+  assert.equal(headersOf(tree)[0].props['aria-expanded'], true, 'clicking the header opens it')
+  const opened = stringsOf(tree).join(' | ')
+  assert.ok(opened.includes('Модуль'), 'the open card names the module')
+  assert.ok(opened.includes('На диске'), 'and says whether the package is on disk')
+  assert.ok(opened.includes('Отдан этой странице'), 'and whether this page was served it')
+  assert.equal(togglesOf(tree).length, 3, 'every manageable card carries a tag control; the panel carries none for itself')
+  console.log('ok  8. the header opens the details and each manageable card has a tag control')
 
   // 9. turning a mod off posts the layer and the row
   requests.length = 0
-  const [firstDisable] = turnOff
-  firstDisable.props.onClick()
+  const disableToggle = togglesOf(tree).find((node) => node.props.title === 'Выключить')
+  assert.ok(disableToggle !== undefined, 'an enabled card offers Turn off')
+  disableToggle.props.onClick(click())
   await tick()
   assert.equal(requests.length, 1, 'turning off issues one host request')
   assert.equal(requests[0].init.method, 'POST')
@@ -348,12 +386,13 @@ try {
     layer: 'profile:web',
     id: 'locale-ru',
   }, 'the action names the layer and the row')
-  console.log('ok  9. Turn off posts the action with its layer and row id')
+  console.log('ok  9. the tag posts the action with its layer and row id')
 
   // 10. turning a mod back on posts enable
   requests.length = 0
-  const [firstEnable] = turnOn
-  firstEnable.props.onClick()
+  const enableToggle = togglesOf(tree).find((node) => node.props.title === 'Включить')
+  assert.ok(enableToggle !== undefined, 'a turned-off card offers Turn on')
+  enableToggle.props.onClick(click())
   await tick()
   assert.equal(requests.length, 1, 'turning on issues one host request')
   assert.deepEqual(JSON.parse(requests[0].init.body), {
@@ -361,7 +400,7 @@ try {
     layer: 'profile:web',
     id: 'old-mod',
   }, 'enable names the turned-off row')
-  console.log('ok 10. Turn on posts the action for the turned-off row')
+  console.log('ok 10. the tag posts enable for the turned-off row')
 
   // 11. a host error code is translated, never shown raw
   respondWith = () => ({ ok: false, code: 'self-managed' })
@@ -379,15 +418,18 @@ try {
   assert.ok(!afterError.includes('self-managed'), 'the raw code is not shown')
   console.log('ok 11. host error codes are translated, not displayed raw')
 
-  // 12. uninstall asks first, then posts
+  // 12. removing lives in the details, and asks first
   respondWith = () => SNAPSHOT
   react.__reset()
   tree = registered.component({})
+  if (headersOf(tree)[0].props['aria-expanded'] === false) headersOf(tree)[0].props.onClick()
+  react.__reset()
+  tree = registered.component({})
   const removeButton = buttonsOf(tree).find((node) => node.props.children === 'Удалить')
-  assert.ok(removeButton !== undefined, 'a manageable installed mod offers Remove')
+  assert.ok(removeButton !== undefined, 'an open card offers Remove')
   // Count only what the click causes: rendering above already issued its read.
   requests.length = 0
-  removeButton.props.onClick()
+  removeButton.props.onClick(click())
   await tick()
   assert.equal(requests.length, 1, 'removing issues one host request')
   assert.equal(JSON.parse(requests[0].init.body).action, 'uninstall')
@@ -398,7 +440,8 @@ try {
   react.__reset()
   const english = stringsOf(registered.component({})).join(' | ')
   assert.ok(english.includes('Installed mods'), 'the English dictionary answers for an English document')
-  assert.ok(english.includes('missing on disk'), 'and its own wording for a missing package')
+  assert.ok(english.includes('Off'), 'and phrases the turned-off tag in its own words')
+  assert.ok(english.includes('On'), 'as well as the enabled one')
   console.log('ok 13. falls back to its own dictionary per document language')
 
   console.log('')

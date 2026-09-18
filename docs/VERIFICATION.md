@@ -36,6 +36,7 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 22 | A clean home installs and boots | `node tools/install.mjs`, then `dsh web` on a scratch home | **PASS** — packages land under `@local/dsh-*`, 171 boot rows, all three mods listed, both host routes `200` |
 | 23 | Turning a mod off and on from the panel, in the real GUI | headless Edge: Settings → Plugins → Mods | **PASS** — turning the prompt mod off removed its row and the route answered `404`; turning it back on restored both; 0 console errors |
 | 24 | The installer places packages where the loader looks | clean home, then read `@local/` | **PASS** — `dsh-locale-ru`, `dsh-mod-manager`, `dsh-system-prompt-mod`; installing under the repository's folder name had left a clean home unable to boot at all |
+| 25 | The cards use the platform's own components, in the real GUI | headless Edge: Settings → Plugins → Mods | **PASS** — green **Включён** tags with the done dot; turning one off flipped it to a red **Выключен** and its row left the patch; 0 console errors, so `Tag`, `StateDot` and the chevron resolve at runtime rather than only in the stub |
 
 ### Reproducing this table
 

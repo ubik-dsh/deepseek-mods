@@ -53,6 +53,18 @@ window.__ModuleLoader__.load({
 			notOnDisk: "missing on disk",
 			selfBadge: "this panel",
 			offBadge: "turned off",
+			stateOn: "On",
+			stateOff: "Off",
+			stateBroken: "No package",
+			detailsModule: "Module",
+			detailsConfig: "Configuration",
+			detailsServed: "Served to this page",
+			detailsOnDisk: "On disk",
+			detailsSize: "Size",
+			detailsActions: "Actions",
+			yes: "yes",
+			no: "no",
+			files: "files",
 			unmanaged: "not managed",
 			disable: "Turn off",
 			enable: "Turn on",
@@ -97,6 +109,18 @@ window.__ModuleLoader__.load({
 			notOnDisk: "нет на диске",
 			selfBadge: "эта панель",
 			offBadge: "выключен",
+			stateOn: "Включён",
+			stateOff: "Выключен",
+			stateBroken: "Нет пакета",
+			detailsModule: "Модуль",
+			detailsConfig: "Конфигурация",
+			detailsServed: "Отдан этой странице",
+			detailsOnDisk: "На диске",
+			detailsSize: "Размер",
+			detailsActions: "Действия",
+			yes: "да",
+			no: "нет",
+			files: "файлов",
 			unmanaged: "не управляется",
 			disable: "Выключить",
 			enable: "Включить",
@@ -265,6 +289,32 @@ window.__ModuleLoader__.load({
 				wordBreak: "break-all",
 			},
 			rowId: { fontSize: "11.5px", opacity: 0.6 },
+			card: {
+				borderRadius: "10px",
+				border: "1px solid var(--dsw-alias-border-secondary, rgba(127,127,127,.28))",
+				background: "var(--dsw-alias-bg-secondary, rgba(127,127,127,.05))",
+				overflow: "hidden",
+			},
+			cardHeader: {
+				display: "flex",
+				alignItems: "center",
+				gap: "10px",
+				padding: "10px 12px",
+				cursor: "pointer",
+			},
+			cardMain: { flex: "1 1 auto", minWidth: 0 },
+			cardRight: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 },
+			dot: { display: "inline-flex", alignItems: "center" },
+			chevron: { display: "inline-flex", opacity: 0.55, transition: "transform .15s ease" },
+			details: {
+				display: "grid",
+				gridTemplateColumns: "auto minmax(0, 1fr)",
+				gap: "4px 14px",
+				margin: 0,
+				padding: "0 12px 12px",
+				fontSize: "12.5px",
+			},
+			detailsLabel: { opacity: 0.6 },
 			badges: { display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "center", marginTop: "4px" },
 			badge: { fontSize: "11px", opacity: 0.85 },
 			actions: { display: "flex", gap: "6px", flexWrap: "nowrap" },
@@ -290,9 +340,13 @@ window.__ModuleLoader__.load({
 			// function each time, and the effect below would refetch forever.
 			const t = react.useMemo(() => translator(props?.t), [props?.t]);
 			const [state, setState] = react.useState(null);
-			const [served, setServed] = react.useState(() => servedNames());
+			// Read on every render rather than remembered at load: the page's own
+			// boot graph is what the panel is reporting, and it can change under it.
+			const served = servedNames();
 			const [busy, setBusy] = react.useState(false);
 			const [notice, setNotice] = react.useState(null);
+			// One open card at a time, the way the shipped plugin inventory behaves.
+			const [expanded, setExpanded] = react.useState(null);
 
 			const load = react.useCallback(() => {
 				setBusy(true);
@@ -306,7 +360,6 @@ window.__ModuleLoader__.load({
 						return;
 					}
 					setState(body);
-					setServed(servedNames());
 				}, (error) => {
 					setNotice({ kind: "error", text: t(ERROR_KEYS[String(error?.message)] ?? "errGeneric") });
 				}).finally(() => {
@@ -328,7 +381,6 @@ window.__ModuleLoader__.load({
 						return;
 					}
 					if (body.state !== undefined) setState(body.state);
-					setServed(servedNames());
 					setNotice({ kind: "info", text: t(okKey) });
 				}, (error) => {
 					setNotice({ kind: "error", text: t(ERROR_KEYS[String(error?.message)] ?? "errGeneric") });
@@ -354,62 +406,113 @@ window.__ModuleLoader__.load({
 				body.push(h("div", { style: styles.notice, key: "loading" }, t("loading")));
 			}
 
-			const rowOf = (layer, row) => {
+			/**
+			 * One mod as an official-style card.
+			 *
+			 * The tag and the dot are the platform's own `Tag` and `StateDot`, with
+			 * the same tones the shipped plugin inventory uses — `success` for on,
+			 * `danger` for off — so a mod reads the way every other plugin in DSH
+			 * reads. Clicking the tag turns the mod off or on; the chevron opens the
+			 * details, where the destructive action lives rather than under the
+			 * cursor of someone scanning the list.
+			 */
+			const cardOf = (layer, row) => {
+				const key = `${layer.key}:${row.id}`;
+				const isOpen = expanded === key;
 				const present = row.package !== null && row.package !== undefined;
 				const isServed = served.has(row.name);
-				const badges = h("div", { style: styles.badges },
-					row.disabled ? badge(t, "offBadge", "solid") : null,
-					row.self ? badge(t, "selfBadge", "solid") : null,
-					!row.managed ? h("span", { style: styles.badge, key: "unmanaged" }, t("unmanaged")) : null,
-					present
-						? h("span", { style: styles.badge, key: "disk" }, `• ${t("onDisk")}`)
-						: badge(t, "notOnDisk", "neutral"),
-					h("span", { style: styles.badge, key: "served" }, isServed ? `• ${t("served")}` : `• ${t("notServed")}`));
-
-				// Which toggle is offered follows whether the row is in the patch
-				// file, not whether the package is on disk: a broken row can still
-				// be turned off, and a turned-off row is the only thing that can be
-				// turned back on.
 				const canManage = row.managed && !row.self;
-				const actions = h("div", { style: styles.actions },
-					canManage
-						? (row.disabled
-							? h(primitives.Button, {
-								variant: "outline",
-								disabled: busy,
-								key: "enable",
-								title: present ? undefined : t("errPackageNotInstalled"),
-								onClick: () => {
-									run({ action: "enable", layer: layer.key, id: row.id }, "okEnabled");
-								},
-							}, t("enable"))
-							: h(primitives.Button, {
-								variant: "outline",
-								disabled: busy,
-								key: "disable",
-								onClick: () => {
-									run({ action: "disable", layer: layer.key, id: row.id }, "okDisabled");
-								},
-							}, t("disable")))
-						: null,
-					canManage && present && !row.disabled
-						? h(primitives.Button, {
-							variant: "ghost",
-							disabled: busy,
-							key: "uninstall",
-							onClick: () => {
-								if (globalThis.confirm?.(t("confirmUninstall")) === false) return;
-								run({ action: "uninstall", layer: layer.key, id: row.id }, "okUninstalled");
-							},
-						}, t("uninstall"))
-						: null);
+				const broken = !present;
+				const tone = row.disabled ? "danger" : (broken ? "warning" : "success");
+				const label = row.disabled ? t("stateOff") : (broken ? t("stateBroken") : t("stateOn"));
+				const dotState = row.disabled ? "idle" : (broken ? "error" : (isServed ? "done" : "idle"));
 
-				return h("div", { style: styles.row, key: `${layer.key}:${row.id}` },
-					h("div", { style: { minWidth: 0 } },
-						h("div", { style: styles.modName }, row.name),
-						h("div", { style: styles.rowId }, `id: ${row.id}`),
-						badges),
-					actions);
+				const act = (payload, okKey) => (event) => {
+					if (typeof event?.stopPropagation === "function") event.stopPropagation();
+					run(payload, okKey);
+				};
+
+				const tag = h(primitives.Tag, { tone, key: "tag" }, label);
+				const right = h("div", { style: styles.cardRight },
+					row.self ? h("span", { style: styles.badge, key: "self" }, t("selfBadge")) : null,
+					!row.managed ? h("span", { style: styles.badge, key: "unmanaged" }, t("unmanaged")) : null,
+					h("span", { style: styles.dot, key: "dot", title: isServed ? t("served") : t("notServed") },
+						h(primitives.StateDot, { state: dotState })),
+					canManage
+						? h("span", {
+							key: "toggle",
+							role: "button",
+							title: row.disabled ? t("enable") : t("disable"),
+							style: { display: "inline-flex", cursor: busy ? "default" : "pointer" },
+							onClick: row.disabled
+								? act({ action: "enable", layer: layer.key, id: row.id }, "okEnabled")
+								: act({ action: "disable", layer: layer.key, id: row.id }, "okDisabled"),
+						}, tag)
+						: tag,
+					h("span", {
+						key: "chevron",
+						style: { ...styles.chevron, transform: isOpen ? "rotate(180deg)" : "none" },
+					}, h(primitives.IconChevronDownOutline14, {})));
+
+				const pair = (name, value, id) => [
+					h("dt", { style: styles.detailsLabel, key: `${id}-l` }, name),
+					h("dd", { style: { margin: 0, wordBreak: "break-all" }, key: `${id}-v` }, value),
+				];
+				const rows = [
+					pair(t("detailsModule"), row.name, "m"),
+					pair(t("detailsConfig"), row.disabled ? t("stateOff") : t("stateOn"), "c"),
+					pair(t("detailsServed"), isServed ? t("yes") : t("no"), "s"),
+					pair(t("detailsOnDisk"), present ? t("yes") : t("no"), "d"),
+				];
+				if (present) {
+					rows.push(pair(t("detailsSize"), `${sizeOf(row.package.bytes)} · ${String(row.package.files)} ${t("files")}`, "z"));
+				}
+				if (canManage) {
+					rows.push(
+						h("dt", { style: styles.detailsLabel, key: "a-l" }, t("detailsActions")),
+						h("dd", { style: { margin: 0 }, key: "a-v" }, h("div", { style: styles.actions },
+							row.disabled
+								? h(primitives.Button, {
+									variant: "outline",
+									disabled: busy,
+									key: "enable",
+									onClick: act({ action: "enable", layer: layer.key, id: row.id }, "okEnabled"),
+								}, t("enable"))
+								: h(primitives.Button, {
+									variant: "outline",
+									disabled: busy,
+									key: "disable",
+									onClick: act({ action: "disable", layer: layer.key, id: row.id }, "okDisabled"),
+								}, t("disable")),
+							present && !row.disabled
+								? h(primitives.Button, {
+									variant: "ghost",
+									disabled: busy,
+									key: "uninstall",
+									onClick: (event) => {
+										if (typeof event?.stopPropagation === "function") event.stopPropagation();
+										if (globalThis.confirm?.(t("confirmUninstall")) === false) return;
+										run({ action: "uninstall", layer: layer.key, id: row.id }, "okUninstalled");
+									},
+								}, t("uninstall"))
+								: null)),
+					);
+				}
+
+				return h("div", { style: styles.card, key },
+					h("div", {
+						style: styles.cardHeader,
+						role: "button",
+						"aria-expanded": isOpen,
+						onClick: () => {
+							setExpanded(isOpen ? null : key);
+						},
+					},
+						h("div", { style: styles.cardMain },
+							h("div", { style: styles.modName }, row.name),
+							h("div", { style: styles.rowId }, row.id)),
+						right),
+					isOpen ? h("dl", { style: styles.details }, rows) : null);
 			};
 
 			for (const layer of state?.layers ?? []) {
@@ -418,7 +521,7 @@ window.__ModuleLoader__.load({
 						`${layer.label}${layer.exists ? "" : ` — ${t("layerMissing")}`}`),
 					layer.rows.length === 0
 						? h("div", { style: styles.noticeInfo }, t("empty"))
-						: layer.rows.map((row) => rowOf(layer, row))));
+						: layer.rows.map((row) => cardOf(layer, row))));
 			}
 
 			if ((state?.orphans ?? []).length > 0) {
