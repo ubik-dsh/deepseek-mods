@@ -137,6 +137,54 @@ ok('adoption survives a re-check',
 ok('an entry can be forgotten', MOD.forget(rechecked.entry.id).ok === true)
 ok('forgetting it again is refused', MOD.forget(rechecked.entry.id).code === 'no-such-entry')
 
+// ── a taken part is not a gain until it has a home ────────────────────────────
+//
+// "Reject the skill, take these parts" produced twenty strings, and a string is not a
+// capability: no home, no trigger, nothing it needs, no way to tell whether it worked.
+// Two parts are also not the same kind of thing — "state the facts before the first
+// edit" needs nothing, while "match the Git branch against the base list" needs 1C
+// installed and a project file. That difference is the `needs` field.
+
+const placed = MOD.record({
+  name: 'with-parts', repo: 'someone/repo', keep: 'no', runsHere: 'after porting',
+  hearing: { verdict: 'reject the skill, take these parts' },
+  taken: [
+    { part: 'state the facts before the first edit', home: 'checklist',
+      trigger: 'before the first edit to a file', needs: 'nothing' },
+    { part: 'match the Git branch against the base list', home: 'script',
+      trigger: 'when a 1C base has to be chosen', needs: '1C installed' },
+    'a bare string from an older entry',
+  ],
+})
+ok('a part can carry a home and a trigger', placed.entry?.taken?.[0]?.home === 'checklist')
+ok('and what it needs to run at all', placed.entry?.taken?.[1]?.needs === '1C installed')
+ok('a bare string still records, with no home',
+  placed.entry?.taken?.[2]?.part === 'a bare string from an older entry'
+  && placed.entry?.taken?.[2]?.home === '',
+  'an older entry must not become unreadable')
+ok('and it is marked as recorded rather than placed',
+  placed.entry?.taken?.[2]?.state === 'recorded')
+ok('an unknown home is refused rather than stored',
+  MOD.record({ name: 'bad-home', repo: 'someone/repo', keep: 'yes', runsHere: 'yes',
+    hearing: { verdict: 'acquit' },
+    taken: [{ part: 'x', home: 'somewhere-else' }] }).entry?.taken?.[0]?.home === '')
+
+const counts = MOD.snapshot()
+ok('the snapshot counts every part taken', counts.takenTotal >= 3, String(counts.takenTotal))
+ok('and how many have a home', counts.takenPlaced >= 2, String(counts.takenPlaced))
+ok('and how many have been trialled', counts.takenTrialled === 0,
+  'none of them have been trialled yet, and the count should say so')
+
+const given = MOD.place({
+  id: placed.entry.id, index: 2, part: { home: 'rule', trigger: 'always', needs: 'nothing' },
+})
+ok('a part can be given a home afterwards', given.ok === true)
+ok('and the count of placed parts rises', MOD.snapshot().takenPlaced >= 3)
+ok('an index that is not a part is refused',
+  MOD.place({ id: placed.entry.id, index: 99, part: { home: 'rule' } }).code === 'no-such-part')
+ok('and a part cannot be emptied',
+  MOD.place({ id: placed.entry.id, index: 0, part: { part: '' } }).code === 'empty-part')
+
 // ── the snapshot the panel reads ──────────────────────────────────────────────
 
 MOD.record({ name: 'keepme', repo: 'someone/repo', keep: 'yes', runsHere: 'yes',
@@ -149,10 +197,12 @@ MOD.adopt('someone-keepme', true)
 
 const snapshot = MOD.snapshot()
 ok('the snapshot carries the tasks', Array.isArray(snapshot.tasks))
-ok('the snapshot counts the entries', snapshot.entries.length === 3, String(snapshot.entries.length))
+// Five, because the part-shape block above files two more. Counting them here keeps
+// the number honest instead of moving the block and hiding the arithmetic.
+ok('the snapshot counts the entries', snapshot.entries.length === 5, String(snapshot.entries.length))
 ok('the snapshot counts what is adopted', snapshot.adopted === 1, String(snapshot.adopted))
-ok('the snapshot counts what runs here', snapshot.runnable === 1, String(snapshot.runnable))
-ok('the snapshot counts what is worth keeping', snapshot.keepable === 2, String(snapshot.keepable))
+ok('the snapshot counts what runs here', snapshot.runnable === 2, String(snapshot.runnable))
+ok('the snapshot counts what is worth keeping', snapshot.keepable === 3, String(snapshot.keepable))
 ok('the snapshot names both files it owns',
   snapshot.queuePath.startsWith(scratch) && snapshot.cataloguePath.startsWith(scratch))
 

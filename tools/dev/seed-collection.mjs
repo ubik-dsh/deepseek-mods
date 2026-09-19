@@ -21,6 +21,48 @@ const base = process.argv[2] ?? 'http://127.0.0.1:3080'
 const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 const cookie = mintSessionCookie(base, home)
 
+/**
+ * Where each taken part should live, and what makes it fire.
+ *
+ * The verdict said what to take and nothing about where it goes, so twenty parts sat in
+ * a list being counted as gains. A part is a gain when it has a home: a checklist line
+ * fires on a situation, a script needs an environment, a rule applies always.
+ *
+ * `needs` is what the part requires to run at all — and it is the field that separates
+ * "state the facts before the first edit", which needs nothing, from "match the Git
+ * branch against the base list", which needs 1C installed and a project file to read.
+ */
+const DISPOSITION = [
+  ['state the facts before the first edit', 'checklist', 'before the first edit to a file', 'nothing'],
+  ['a destructive-command gate', 'rule', 'before a command that deletes or overwrites', 'the command text'],
+  ['a delivery gate on a deterministic fact', 'rule', 'before declaring work finished', 'a fact that correlates with the goal, not a file mtime'],
+  ['the verdict vocabulary', 'checklist', 'when deciding whether to adopt anything', 'nothing'],
+  ['the filter that rejects "X is important"', 'rule', 'when writing advice into a skill', 'nothing'],
+  ['name the missing evidence', 'rule', 'whenever a claim has no measurement behind it', 'nothing'],
+  ['the output shape: main assumption', 'checklist', 'before starting work whose value is unproven', 'nothing'],
+  ['the severity floors that are checkable', 'rule', 'when assigning severity in any review', 'nothing'],
+  ['conflicting recommendations: keep both', 'rule', 'when two reviewers disagree', 'nothing'],
+  ['the anti-pattern rows that are general', 'checklist', 'when coordinating more than one agent', 'more than one agent running'],
+  ['approve with a reason', 'rule', 'when a plan needs approving', 'a plan and a decider'],
+  ['the rule and its reason', 'rule', 'always, for any agent touching 1C data', 'a 1C system'],
+  ['the reflex of answering with an alternative', 'rule', 'when refusing a request', 'nothing'],
+  ['the narrow read-only exception', 'rule', 'when a task is genuinely about performance', 'the user\'s agreement'],
+  ['verify metadata before composing a query', 'checklist', 'before writing a query against an unknown schema', 'a way to read the schema'],
+  ['the 1C traps that the documentation buries', 'checklist', 'when writing a 1C query with compound types', 'a 1C system'],
+  ['the base-selection order', 'script', 'when a 1C base has to be chosen', '1C installed and a project file'],
+  ['the two parameters that drive 1C', 'script', 'when an agent must operate 1C, not merely open it', '1C installed'],
+]
+
+/** Attach a home and a trigger, or leave the part honestly homeless. */
+function dispose(part) {
+  const body = typeof part === 'string' ? part : part.part
+  const found = DISPOSITION.find(([needle]) => body.includes(needle))
+  if (found === undefined) {
+    return { part: body, home: '', trigger: '', needs: '', state: 'recorded' }
+  }
+  return { part: body, home: found[1], trigger: found[2], needs: found[3], state: 'recorded' }
+}
+
 const ECC = 'affaan-m/ECC'
 const WA = 'wshobson/agents'
 
@@ -166,7 +208,11 @@ for (const entry of ENTRIES) {
   const response = await fetch(`${base}/api/skill-scout.mod`, {
     method: 'POST',
     headers: { cookie, accept: 'application/json', 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'record', ...entry, url: `https://github.com/${entry.repo}` }),
+    body: JSON.stringify({
+      action: 'record', ...entry,
+      taken: (entry.taken ?? []).map(dispose),
+      url: `https://github.com/${entry.repo}`,
+    }),
   })
   const body = await response.json().catch(() => null)
   const item = body?.entry

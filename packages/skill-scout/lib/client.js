@@ -61,7 +61,7 @@ window.__ModuleLoader__.load({
 			against: "vs",
 			cases: "hearing(s) behind it",
 			uncalibrated: "not calibrated — too few hearings to read as a scale",
-			taken: "Taken from it",
+			takenFrom: "Taken from it",
 			open: "Open the source",
 			discuss: "Discuss with the agent",
 			copyLabel: "Paste this into the chat",
@@ -70,7 +70,15 @@ window.__ModuleLoader__.load({
 			discussLead: "Let us discuss the skill",
 			discussAsk: "Tell me what is worth taking from it and what it would give our family of skills, then say what you propose — install, port, or drop. I will answer install it or leave it.",
 			added: "Added",
-			forget: "Forget",
+			forget: "Remove from the list",
+			addedOn: "Added",
+			home: "Lives in",
+			noHome: "nowhere yet — not usable until it has a home",
+			partState: "state",
+			fires: "fires when",
+			partsLine: "parts taken",
+			placed: "placed",
+			trialled: "trialled",
 			noteKeep: "Worth keeping is the verdict of the hearing. Runs here is a separate question — a good skill for a mechanism this Harness does not have is good and unusable, and one score would hide that.",
 			noteCollector: "This is a store, not a search. The scout reads it first and only then goes to GitHub, so a skill found once is never hunted for again.",
 			noteQueue: "The tab is a board, not a worker. It writes the task; an agent runs the search, because searching needs a token and the network and neither belongs behind a button in a browser.",
@@ -119,7 +127,7 @@ window.__ModuleLoader__.load({
 			against: "против",
 			cases: "дел за ним",
 			uncalibrated: "не калибровано — дел слишком мало, чтобы читать как шкалу",
-			taken: "Взято из него",
+			takenFrom: "Взято из него",
 			open: "Открыть источник",
 			discuss: "Обсудить с агентом",
 			copyLabel: "Скопируй это в чат",
@@ -128,7 +136,15 @@ window.__ModuleLoader__.load({
 			discussLead: "Обсудим скилл",
 			discussAsk: "Расскажи, что из него стоит взять и что это даст нашей семье скиллов, и что предлагаешь — поставить, перенести или отказаться. Я отвечу «ставь» или «откажись».",
 			added: "Добавлено",
-			forget: "Забыть",
+			forget: "Удалить из списка",
+			addedOn: "Добавлено",
+			home: "Живёт в",
+			noHome: "пока нигде — не применимо, пока нет дома",
+			partState: "состояние",
+			fires: "срабатывает когда",
+			partsLine: "частей взято",
+			placed: "размещено",
+			trialled: "испытано",
 			noteKeep: "«Стоит держать» — вердикт суда. «Работает здесь» — отдельный вопрос: хороший скилл для механизма, которого в этом Harness нет, хорош и неприменим, и одна оценка это скрыла бы.",
 			noteCollector: "Это запасник, а не поиск. Скаут читает его первым и только потом идёт на GitHub, поэтому найденное однажды больше не ищется.",
 			noteQueue: "Вкладка — доска, а не работник. Она пишет задание; поиск выполняет агент, потому что для поиска нужен токен и сеть, и ни то ни другое не должно стоять за кнопкой в браузере.",
@@ -368,7 +384,11 @@ window.__ModuleLoader__.load({
 
 			// ── the catalogue ─────────────────────────────────────────────────
 			const catalogueSection = [h("div", { style: styles.sectionName, key: "n" },
-				`${t("catalogue")}${state === null ? "" : ` · ${String(state.entries.length)}`}`)];
+				`${t("catalogue")}${state === null ? "" : ` · ${String(state.entries.length)}`}`
+				+ (state === null || state.takenTotal === undefined ? ""
+					: ` · ${t("partsLine")} ${String(state.takenTotal)}, `
+						+ `${t("placed")} ${String(state.takenPlaced)}, `
+						+ `${t("trialled")} ${String(state.takenTrialled)}`))];
 			if (state !== null && state.entries.length === 0) {
 				catalogueSection.push(h("div", { style: styles.empty, key: "e" }, t("catalogueEmpty")));
 			}
@@ -393,7 +413,22 @@ window.__ModuleLoader__.load({
 						"rt"));
 				}
 				if (entry.taken?.length) {
-					rows.push(pair(t("taken"), entry.taken.join(" · "), "tk"));
+					// Each part with its home and its trigger, because a part without them is a
+					// wish. The state is shown so that "recorded" is visibly not "done".
+					const parts = entry.taken.map((one, index) => {
+						const part = typeof one === "string"
+							? { part: one, home: "", trigger: "", state: "recorded" }
+							: one;
+						const where = part.home === ""
+							? t("noHome")
+							: `${t("home")}: ${part.home}`;
+						return h("div", { key: `part-${String(index)}`, style: { marginBottom: "5px" } },
+							h("div", {}, `${String(index + 1)}. ${part.part}`),
+							h("div", { style: { opacity: 0.6, fontSize: "11.5px" } },
+								`${where} · ${t("partState")}: ${part.state}`
+								+ (part.trigger ? ` · ${t("fires")}: ${part.trigger}` : "")));
+					});
+					rows.push(pair(t("takenFrom"), h("div", {}, ...parts), "tk"));
 				}
 				if (entry.note) rows.push(pair("", entry.note, "nt"));
 				rows.push(

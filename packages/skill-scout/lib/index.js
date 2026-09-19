@@ -37,6 +37,18 @@ import { dirname, join } from 'node:path'
 
 export const name = 'skill-scout'
 
+/**
+ * Where a taken part can live, and how far along it is.
+ *
+ * A part is not "taken" when it is written down; it is taken when it has a home. The
+ * states are ordered so that a part which never gets past `recorded` is visible as
+ * unfinished rather than counted as a gain.
+ */
+export const HOMES = ['rule', 'checklist', 'script', 'skill', 'note']
+
+/** Ordered from least to most placed. `recorded` means it has nowhere to live yet. */
+export const PART_STATES = ['recorded', 'placed', 'trialled', 'kept', 'dropped']
+
 /** The host service the route needs. */
 export const inject = ['connection']
 
@@ -110,6 +122,29 @@ export function writeCatalogue(catalogue) {
 function entryId(repo, name) {
   const owner = String(repo ?? '').split('/')[0] ?? 'unknown'
   return `${owner}-${name}`.toLowerCase().replace(/[^a-z0-9-]+/gu, '-')
+}
+
+/**
+ * One taken part, in the shape that makes it usable.
+ *
+ * A bare string is accepted and normalised, because the earlier entries were written
+ * that way — but it lands with no home, and no home is the honest state for "we liked
+ * this and have not decided where it goes".
+ */
+function partOf(value) {
+  const text = (field, limit) => String(field ?? '').trim().slice(0, limit)
+  if (typeof value === 'string') {
+    return { part: value.slice(0, 400), home: '', trigger: '', needs: '', state: 'recorded' }
+  }
+  const home = text(value?.home, 20)
+  const state = text(value?.state, 20)
+  return {
+    part: text(value?.part ?? value?.text, 400),
+    home: HOMES.includes(home) ? home : '',
+    trigger: text(value?.trigger, 300),
+    needs: text(value?.needs, 300),
+    state: PART_STATES.includes(state) ? state : 'recorded',
+  }
 }
 
 function taskId() {
@@ -233,7 +268,7 @@ export function record(payload) {
       verdict,
       cases: Number.isInteger(payload?.hearing?.cases) ? payload.hearing.cases : null,
     },
-    taken: Array.isArray(payload?.taken) ? payload.taken.slice(0, 20).map(String) : [],
+    taken: Array.isArray(payload?.taken) ? payload.taken.slice(0, 20).map(partOf) : [],
     adopted: payload?.adopted === true,
     adoptedAt: payload?.adopted === true ? new Date().toISOString() : null,
     discussedAt: payload?.discussedAt ?? null,
@@ -280,6 +315,29 @@ export function discuss(id) {
   return { ok: true, entry }
 }
 
+/**
+ * Give a taken part a home, a trigger, or a state.
+ *
+ * This is the step the verdict was missing. "Take this part" is a wish until something
+ * says where the part lives and what makes it fire — and until then the collection is a
+ * pile of good intentions with ratings attached.
+ */
+export function place(payload) {
+  const catalogue = readCatalogue()
+  const entry = catalogue.entries.find((item) => item.id === payload?.id)
+  if (entry === undefined) return { code: 'no-such-entry' }
+  const index = Number(payload?.index)
+  if (!Number.isInteger(index) || index < 0 || index >= (entry.taken?.length ?? 0)) {
+    return { code: 'no-such-part' }
+  }
+  const current = partOf(entry.taken[index])
+  const next = partOf({ ...current, ...payload.part })
+  if (next.part === '') return { code: 'empty-part' }
+  entry.taken[index] = next
+  writeCatalogue(catalogue)
+  return { ok: true, entry }
+}
+
 /** The Add button. A person decides what gets adopted, never the pipeline. */
 export function adopt(id, adopted) {
   const catalogue = readCatalogue()
@@ -318,6 +376,14 @@ export function snapshot() {
     runnable: catalogue.entries.filter((entry) => entry.runsHere === 'yes').length,
     keepable: catalogue.entries.filter((entry) => entry.keep === 'yes'
       || entry.keep === 'with a boundary').length,
+    // A part with no home is not yet a gain. These two numbers are the difference
+    // between what the hearings produced and what has actually been placed.
+    takenTotal: catalogue.entries.reduce((sum, item) => sum + (item.taken?.length ?? 0), 0),
+    takenPlaced: catalogue.entries.reduce(
+      (sum, item) => sum + (item.taken ?? []).filter((one) => partOf(one).home !== '').length, 0),
+    takenTrialled: catalogue.entries.reduce(
+      (sum, item) => sum + (item.taken ?? []).filter(
+        (one) => ['trialled', 'kept', 'dropped'].includes(partOf(one).state)).length, 0),
     softLimit: CATALOGUE_SOFT_LIMIT,
   }
 }
@@ -366,6 +432,7 @@ export function apply(ctx) {
           case 'dismiss': result = dismiss(payload?.id); break
           case 'record': result = record(payload); break
           case 'discuss': result = discuss(payload?.id); break
+          case 'place': result = place(payload); break
           case 'adopt': result = adopt(payload?.id, payload?.adopted); break
           case 'forget': result = forget(payload?.id); break
           default: result = { code: 'bad-request' }
