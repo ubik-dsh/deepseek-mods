@@ -78,6 +78,19 @@ const scrub = (text, secrets) => {
   return out
 }
 
+/**
+ * Which host a token belongs to, judged by its shape.
+ *
+ * Saving one host's token into the other's file is an easy mistake with an
+ * obscure symptom — the push simply fails to authenticate, and nothing says
+ * why. GitHub's tokens announce themselves; GitVerse's are opaque.
+ *
+ * @param token - the token read from a file.
+ * @returns `'github'`, or `'unknown'`.
+ */
+const tokenShape = (token) =>
+  token.startsWith('ghp_') || token.startsWith('github_pat_') ? 'github' : 'unknown'
+
 const remotes = git(['remote']).split('\n').map((line) => line.trim()).filter(Boolean)
 const head = git(['rev-parse', '--short', 'HEAD']).trim()
 console.log(`repository: ${REPO}`)
@@ -105,6 +118,19 @@ for (const mirror of MIRRORS) {
   if (token === '') {
     console.log(`\n${mirror.name}: skipped — the token file is empty`)
     skipped.push(`${mirror.name} (empty token)`)
+    continue
+  }
+  // A GitHub token sitting in the GitVerse file authenticates nowhere and says
+  // nothing about why; catch it here instead of at the far end.
+  const shape = tokenShape(token)
+  if (mirror.name === 'gitverse' && shape === 'github') {
+    console.log(`\n${mirror.name}: skipped — this file holds a **GitHub** token, not a GitVerse one`)
+    skipped.push(`${mirror.name} (wrong token in file)`)
+    continue
+  }
+  if (mirror.name === 'github' && shape !== 'github') {
+    console.log(`\n${mirror.name}: skipped — this does not look like a GitHub token (no ghp_/github_pat_ prefix)`)
+    skipped.push(`${mirror.name} (wrong token in file)`)
     continue
   }
   secrets.push(token, Buffer.from(`x-access-token:${token}`).toString('base64'))

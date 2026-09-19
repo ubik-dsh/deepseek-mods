@@ -11,6 +11,20 @@ backup/
 settings.yaml
 system-prompt-mod.json
 
+# Access tokens, wherever someone happens to save them.
+#
+# A token file dropped into this directory was committed once and only stopped by
+# GitHub's push protection, which is a backstop, not a plan. These rules are the
+# plan: pushing needs a credential, so the credential tends to end up near the
+# thing being pushed.
+*token*
+*token
+token*
+*.token
+.env
+.env.*
+secrets.*
+
 # Verification harness artefacts.
 _edge-profile*/
 _testhome*/
