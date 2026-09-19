@@ -125,6 +125,36 @@ record(
     : `HTTP ${String(managerRoute.status)} — the row is not mounted; restart \`dsh web\` if it was added while the server was running after a failed import`,
 )
 
+// 6. the skill manager's route answers and describes the same home
+//
+// The skills themselves depend on which workspaces this machine has, so the check
+// asserts the shape a page needs — a list and the roots it came from — rather than a
+// count that would differ on every machine. A route that mounts but finds no roots
+// answers 200 with total 0, which is exactly the failure this check exists to catch:
+// the first version resolved the project from the server's working directory instead
+// of from the workspace store, and the panel came up empty in a live session.
+const skillRoute = await get('/api/skill-manager.mod')
+let skillBody = null
+try {
+  skillBody = await skillRoute.json()
+} catch {}
+const skillState = skillBody?.state
+const skillShaped = skillState !== undefined
+  && typeof skillState.total === 'number'
+  && Array.isArray(skillState.skills)
+  && Array.isArray(skillState.roots)
+  && Array.isArray(skillState.workspaces)
+record(
+  'the skill manager route answers and lists roots',
+  skillRoute.status === 200 && skillBody?.ok === true && skillShaped,
+  skillRoute.status === 200
+    ? `HTTP 200, ${String(skillState?.total ?? 0)} skill(s) from ${String(
+      (skillState?.roots ?? []).filter((root) => root.exists).length,
+    )} existing root(s), ${String(skillState?.paused ?? 0)} paused, workspace(s): ${
+      (skillState?.workspaces ?? []).map((space) => space.title).join(', ') || 'none'}`
+    : `HTTP ${String(skillRoute.status)} — the row is not mounted; restart \`dsh web\` if it was added while the server was running after a failed import`,
+)
+
 // verdict
 const failed = results.filter((result) => !result.ok)
 console.log('')

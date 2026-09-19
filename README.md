@@ -11,6 +11,7 @@ Three mods live here:
 |---|---|
 | **[system-prompt-mod](packages/system-prompt-mod)** | A **Промпт / Prompt** button in the chat header that opens the live system prompt, lets you edit it, and applies the result on the next model request — no restart. |
 | **[locale-ru](packages/locale-ru)** | **Russian localization** for the whole GUI: 42 namespaces, 1257 strings, selectable in Settings → General → Language. |
+| **[skill-manager](packages/skill-manager)** | A **Skills** tab in Settings → Plugins, after Mods: every skill this Harness resolves, with the description the model is matched against and a one-line summary for a person. Pause a skill and the model stops being offered it on the next request — no restart. |
 | **[mod-manager](packages/mod-manager)** | A **Mods** tab in Settings → Plugins: what is installed, whether the page was actually served it, and turn-off / turn-on / remove — without a restart. |
 
 *Русская версия этого файла: [README.ru.md](README.ru.md).*

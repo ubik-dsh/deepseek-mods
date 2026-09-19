@@ -50,7 +50,7 @@ console.log(`GET / -> 200 (${String(html.length)} bytes)`)
 console.log(`boot rows referencing /client.js: ${String((html.match(/\/client\.js/gu) ?? []).length)}`)
 const wanted = names.length > 0
   ? names
-  : ['dsh-system-prompt-mod', 'dsh-locale-ru', 'dsh-mod-manager']
+  : ['dsh-system-prompt-mod', 'dsh-locale-ru', 'dsh-mod-manager', 'dsh-skill-manager']
 let failed = 0
 for (const name of wanted) {
   const present = html.includes(name)

@@ -10,6 +10,9 @@ are an AI agent working here, read this first.
 - `packages/locale-ru/` — a browser-only plugin: the Russian language pack.
 - `packages/mod-manager/` — a dual-face plugin: a Settings tab that lists
   installed mods and turns them off, on, or removes them.
+- `packages/skill-manager/` — a dual-face plugin: a Settings tab that lists the
+  skills this Harness resolves, gives each a model-facing description and a
+  one-line human summary, and pauses or resumes it by renaming the file DSH reads.
 - `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
   the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
@@ -54,6 +57,7 @@ node tools/dev/test-locale-ru.mjs      # language pack contract
 node tools/dev/test-links.mjs          # markdown links and anchors
 node tools/dev/test-mod-manager.mjs    # mod manager, host half
 node tools/dev/test-mod-manager-client.mjs  # mod manager, browser bundle
+node tools/dev/test-skill-manager.mjs       # skill manager, host half
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 node tools/dev/push-mirrors.mjs        # push to every published mirror

@@ -1,0 +1,30 @@
+{
+  "name": "@local/dsh-skill-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH plugin: a Settings panel that lists the skills this Harness resolves, with each one's description, and pauses or resumes any of them by renaming the file DSH reads — no deletion, no restart",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

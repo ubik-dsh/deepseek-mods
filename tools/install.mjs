@@ -101,6 +101,7 @@ const PATCH_TEMPLATE = `${PATCH_HEADER}\n[]\n`
 /** State files the mods own, plus the GUI settings the run depends on. */
 const STATE_FILES = [
   join(home, 'system-prompt-mod.json'),
+  join(home, 'skill-registry.json'),
   join(home, 'settings.yaml'),
 ]
 
