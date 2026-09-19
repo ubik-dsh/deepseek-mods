@@ -64,12 +64,11 @@ window.__ModuleLoader__.load({
 			taken: "Taken from it",
 			open: "Open the source",
 			discuss: "Discuss with the agent",
+			copyLabel: "Paste this into the chat",
 			discussed: "Discussed — ask again",
 			discussHint: "The skill has gone into the chat. Decide it there: say install it or leave it, and the agent records that. Nothing is adopted by a click.",
 			discussLead: "Let us discuss the skill",
 			discussAsk: "Tell me what is worth taking from it and what it would give our family of skills, then say what you propose — install, port, or drop. I will answer install it or leave it.",
-			errNoSession: "No session is open, so there is nowhere to send this. Open a chat first.",
-			errSendFailed: "The message did not reach the chat.",
 			added: "Added",
 			forget: "Forget",
 			noteKeep: "Worth keeping is the verdict of the hearing. Runs here is a separate question — a good skill for a mechanism this Harness does not have is good and unusable, and one score would hide that.",
@@ -123,12 +122,11 @@ window.__ModuleLoader__.load({
 			taken: "Взято из него",
 			open: "Открыть источник",
 			discuss: "Обсудить с агентом",
+			copyLabel: "Скопируй это в чат",
 			discussed: "Обсуждали — ещё раз",
 			discussHint: "Скилл ушёл в чат. Решайте там: скажи «ставь» или «откажись», и агент это запишет. Нажатием ничего не принимается.",
 			discussLead: "Обсудим скилл",
 			discussAsk: "Расскажи, что из него стоит взять и что это даст нашей семье скиллов, и что предлагаешь — поставить, перенести или отказаться. Я отвечу «ставь» или «откажись».",
-			errNoSession: "Открытой сессии нет, отправлять некуда. Открой чат.",
-			errSendFailed: "Сообщение не дошло до чата.",
 			added: "Добавлено",
 			forget: "Забыть",
 			noteKeep: "«Стоит держать» — вердикт суда. «Работает здесь» — отдельный вопрос: хороший скилл для механизма, которого в этом Harness нет, хорош и неприменим, и одна оценка это скрыла бы.",
@@ -213,38 +211,9 @@ window.__ModuleLoader__.load({
 		}
 
 		/**
-		 * Reach the current session's chat from a root-scoped tab.
-		 *
-		 * `conversation.send` reads the session tag off the calling context, and a
-		 * Settings tab carries none — calling it directly throws "requires a session
-		 * scope". The hop through `sessions.scope` is what makes the message land.
-		 */
-		function agentChannel(ctx) {
-			const reach = () => {
-				try {
-					const current = ctx?.sessions?.list?.getSnapshot?.()?.current;
-					if (current === undefined || current === null) return null;
-					const scoped = ctx.sessions.scope(current);
-					if (scoped === undefined || scoped === null) return null;
-					return scoped;
-				} catch {
-					return null;
-				}
-			};
-			return {
-				available: () => reach() !== null,
-				send: async (text) => {
-					const scoped = reach();
-					if (scoped === null) throw new Error("no-session");
-					await scoped.conversation.send(text);
-				},
-			};
-		}
-
-		/**
-		 * What the button says to the agent. It carries the whole decision, because the
-		 * agent has not seen the board: what was found, what the hearing decided, and
-		 * what is being asked of it.
+		 * The sentence to paste into the chat. It carries the whole decision, because
+		 * the agent has not seen this panel: what was found, what the hearing decided,
+		 * and what is being asked of it.
 		 */
 		function discussPrompt(entry, t) {
 			const lines = [
@@ -329,7 +298,6 @@ window.__ModuleLoader__.load({
 			const [text, setText] = react.useState("");
 			const [refreshedAt, setRefreshedAt] = react.useState(null);
 			const [expanded, setExpanded] = react.useState(null);
-			const channel = props?.channel ?? null;
 
 			const load = react.useCallback(() => {
 				void (async () => {
@@ -384,33 +352,6 @@ window.__ModuleLoader__.load({
 				setText("");
 			};
 
-			// Raise the entry in the chat. The catalogue is stamped first, so what was
-			// discussed is recorded even if the message cannot be delivered — and the
-			// person is told which of the two happened.
-			const raise = (entry) => {
-				if (busy) return;
-				if (channel === null || channel.available() !== true) {
-					setNotice({ kind: "error", text: t("errNoSession") });
-					return;
-				}
-				setBusy(true);
-				void (async () => {
-					try {
-						await callHost("POST", { action: "discuss", id: entry.id });
-						await channel.send(discussPrompt(entry, t));
-						setNotice({ kind: "info", text: t("discussHint") });
-						load();
-					} catch (error) {
-						setNotice({
-							kind: "error",
-							text: `${t("errSendFailed")} ${String(error?.message ?? error)}`,
-						});
-					} finally {
-						setBusy(false);
-					}
-				})();
-			};
-
 			const head = h("div", { style: styles.head, key: "head" },
 				h("div", { key: "titles" },
 					h("h3", { style: styles.title }, t("title")),
@@ -456,16 +397,15 @@ window.__ModuleLoader__.load({
 				}
 				if (entry.note) rows.push(pair("", entry.note, "nt"));
 				rows.push(
-					h("dt", { style: styles.detailsLabel, key: "a-l" }, t("discuss")),
+					h("dt", { style: styles.detailsLabel, key: "a-l" }, t("copyLabel")),
 					h("dd", { style: { margin: 0 }, key: "a-v" }, h("div", { style: styles.row },
-						h(primitives.Button, {
-							variant: "outline",
-							disabled: busy,
-							onClick: (event) => {
-								event.stopPropagation();
-								raise(entry);
-							},
-						}, entry.discussedAt ? t("discussed") : t("discuss")),
+						h("textarea", {
+							readOnly: true,
+							value: discussPrompt(entry, t),
+							style: { ...styles.input, minHeight: "76px", fontSize: "11.5px", opacity: 0.9 },
+							// One click takes the whole sentence; there is nothing here to edit.
+							onClick: (event) => { event.stopPropagation(); event.target.select(); },
+						}),
 						h("a", {
 							href: entry.url, target: "_blank", rel: "noreferrer",
 							style: styles.link, key: "open",
@@ -523,7 +463,7 @@ window.__ModuleLoader__.load({
 			return h("div", { style: styles.wrap }, head, ...body);
 		}
 
-		const inject = ["slots", "locale", "sessions", "conversation"];
+		const inject = ["slots", "locale"];
 
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { en, ru }), "skill-scout: dictionaries");
@@ -533,7 +473,6 @@ window.__ModuleLoader__.load({
 				order: 31,
 				label: () => translator(null)("tab"),
 				locale: NS,
-				channel: agentChannel(ctx),
 			}, ScoutTab));
 		}
 

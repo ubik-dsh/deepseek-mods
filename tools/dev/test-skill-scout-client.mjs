@@ -123,12 +123,15 @@ const row = rows[0]
 ok('the row id is the package name', row.id === '@local/dsh-skill-scout', row.id)
 const moduleExports = row.factory(requireStub)
 ok('it exports apply', typeof moduleExports.apply === 'function')
-ok('it injects the registries and the two services the chat needs',
-  JSON.stringify(moduleExports.inject) === JSON.stringify(['slots', 'locale', 'sessions', 'conversation']),
+// Back to two services. The panel briefly injected `sessions` and `conversation` to
+// send the sentence straight into a chat; against a real instance the current session
+// came back empty from a root-scoped tab and the button reported that there was nowhere
+// to send. It now shows the sentence to copy instead, so it needs neither.
+ok('it injects only the registries',
+  JSON.stringify(moduleExports.inject) === JSON.stringify(['slots', 'locale']),
   JSON.stringify(moduleExports.inject))
-// `conversation.send` reads the session tag off the CALLING context, and a Settings tab
-// is root-scoped, so the hop through `sessions.scope` is what makes a message land.
-ok('and therefore asks for a way into a session', moduleExports.inject.includes('sessions'))
+ok('and asks for no session service at all',
+  !moduleExports.inject.includes('sessions') && !moduleExports.inject.includes('conversation'))
 
 // ── apply ─────────────────────────────────────────────────────────────────────
 
@@ -155,8 +158,8 @@ const tab = registered.slots.find((entry) => entry.options !== undefined)
 ok('the tab targets the Plugins settings slot', tab?.name === 'settings.plugins.tab')
 ok('it has its own id', tab?.options?.id === 'skill-scout', String(tab?.options?.id))
 ok('it sorts after the Skills tab', tab?.options?.order === 31, String(tab?.options?.order))
-ok('the tab carries a channel into the chat', tab?.options?.channel !== undefined,
-  'a root-scoped tab cannot call conversation.send directly')
+ok('the tab carries no channel', tab?.options?.channel === undefined,
+  'the panel no longer tries to reach a session it does not have')
 ok('the label resolves in Russian from the DOM language', tab?.options?.label() === 'Коллекция',
   String(tab?.options?.label()))
 
@@ -229,9 +232,9 @@ ok('the notes say nothing is adopted by a click',
   texts.find((v) => v.includes('нажати')) ?? 'not found')
 
 // The button opens a conversation instead of flipping a flag.
-ok('the catalogue card can be raised in the chat',
-  expandedTexts.some((value) => value === 'Обсудить с агентом'),
-  expandedTexts.find((v) => v.includes('Обсуд')) ?? 'not found')
+ok('the card offers the sentence to paste rather than a button',
+  expandedTexts.some((value) => value === 'Скопируй это в чат'),
+  expandedTexts.find((v) => v.includes('Скопир')) ?? 'not found')
 ok('and the Add button is gone',
   !expandedTexts.includes('Добавить'))
 

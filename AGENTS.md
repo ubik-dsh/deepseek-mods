@@ -17,8 +17,8 @@ are an AI agent working here, read this first.
   finds** — skills already found and judged, each with its source, description, two
   axes (worth keeping, runs here), the hearing's rating and the date it entered. The
   scout reads it before it searches, so a skill found once is not hunted for again.
-  **Nothing enters it without a verdict.** Adoption happens in the chat: the button
-  raises the skill with the agent, and a person says install it or leave it.
+  **Nothing enters it without a verdict.** The card shows the sentence to paste into
+  the chat; adoption happens there, and the agent records it.
 - `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
   the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
