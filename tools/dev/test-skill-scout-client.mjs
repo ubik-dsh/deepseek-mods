@@ -235,6 +235,40 @@ ok('the catalogue card can be raised in the chat',
 ok('and the Add button is gone',
   !expandedTexts.includes('Добавить'))
 
+// ── the language, with a platform translator that answers in English ──────────
+//
+// The regression this pins: the tab label was Russian and everything inside it was
+// English. The label is built with no platform translator and read the active language
+// correctly; the panel was handed the platform translator, which answers for its own
+// namespace, falls back to English for keys it does not own, and was consulted first.
+// Handing the panel an English-speaking translator is exactly that situation.
+
+// It answers for EVERY key, not just the ones the label asks for. A fake that
+// only answered for `tab` never reached the render, and the test passed against
+// the broken order — which is how it was caught.
+const englishPlatformT = (key) => `EN:${key}`
+const withPlatform = (() => {
+  // Clear the hooks, not just the cursor. `useMemo` caches by comparing
+  // JSON.stringify of its dependencies, and a function stringifies to null — so a
+  // re-render with a DIFFERENT translator compared equal and the component kept the
+  // first one it was ever given. Mounting fresh is what actually hands it the English
+  // translator. Without this the test passed against the broken order, twice.
+  hooks.length = 0
+  cursor = 0
+  return tab.component({ t: englishPlatformT })
+})()
+const platformTexts = collect(withPlatform).map(textOf).filter((value) => value !== undefined)
+ok('a platform translator answering for every key does not override our dictionary',
+  !platformTexts.some((value) => value.startsWith('EN:')),
+  platformTexts.find((value) => value.startsWith('EN:')) ?? 'none')
+ok('and the panel is in Russian, not English',
+  platformTexts.some((value) => value.includes('Это запасник'))
+  || platformTexts.some((value) => value.includes('Коллекция'))
+  || platformTexts.some((value) => value.includes('Обсудить')),
+  platformTexts.slice(0, 4).join(' | '))
+ok('the language comes from the page, which the language pack sets',
+  registered.locale[0]?.dictionaries?.ru?.tab === 'Коллекция')
+
 console.log('')
 console.log(`${String(checks - failed)}/${String(checks)} checks passed`)
 process.exit(failed === 0 ? 0 : 1)

@@ -141,9 +141,24 @@ window.__ModuleLoader__.load({
 		const DICTIONARIES = { en, ru };
 
 		/** The language the GUI is currently showing, as far as the DOM records it. */
+		/**
+		 * The interface language, from the page first and the browser second.
+		 *
+		 * The language pack sets `documentElement.lang` when the active locale changes,
+		 * so the page is authoritative. `navigator.language` is only a fallback for a
+		 * harness that renders before the locale runtime has run.
+		 */
 		function locale() {
-			const lang = typeof document === "undefined" ? "" : String(document.documentElement?.lang ?? "");
-			return lang.toLowerCase().startsWith("ru") ? "ru" : "en";
+			const candidates = [
+				typeof document === "undefined" ? "" : document.documentElement?.lang,
+				typeof navigator === "undefined" ? "" : navigator.language,
+			];
+			for (const candidate of candidates) {
+				const tag = String(candidate ?? "").toLowerCase();
+				if (tag.startsWith("ru")) return "ru";
+				if (tag.startsWith("en")) return "en";
+			}
+			return "en";
 		}
 
 		/**
