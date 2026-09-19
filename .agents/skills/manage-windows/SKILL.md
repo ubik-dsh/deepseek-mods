@@ -7,18 +7,8 @@ metadata:
   spec: https://agentskills.io/specification
   version: 0.1.0
   status: first formulation, assembled from twelve hearings and one session of getting it wrong
-  borrowed_from: >-
-    raphaol/powershell-windows-best-skill (powershell-windows-master) for the trap list —
-    ConvertTo-Json without -Depth, parentheses around cmdlets used with logical operators,
-    null checks before property access, the script header template, and the exact PowerShell
-    invocation; browser-use/windows-harness for one call per decision point, the
-    foreground-first input ladder, and writing generated scripts to the tool's own directory;
-    Lucien-1127/strata-skill (windows-automation) for the CMD encoding trap and the shortcut
-    COM lines; mturac/everything-openai-codex (windows-desktop-e2e) for the accessibility-tree
-    rung. All found through find-a-skill, judged through judge-a-skill, and recorded with the
-    parts each was rejected down to.
-  sibling: learn-an-interface, which holds the method — the order of channels and how to find
-    an unknown control. This skill holds the platform: what Windows does that surprises you.
+  borrowed_from: raphaol/powershell-windows-best-skill for the trap list, browser-use/windows-harness for one call per decision point and the input ladder, Lucien-1127/strata-skill for the CMD encoding trap, mturac/everything-openai-codex for the accessibility-tree rung - all found through find-a-skill and judged through judge-a-skill
+  sibling: learn-an-interface holds the method, the order of channels and how to find an unknown control; this skill holds the platform, and what Windows does that surprises you
 ---
 
 # Working on Windows
@@ -131,7 +121,25 @@ land.** Four checks, all cheap, all mechanical:
    second earlier;
 3. the pointer is inside the window's rectangle, after the move and before the press;
 4. the coordinates came from a measurement of **this** window, not from a screenshot of
-   another one or from a guess.
+   another one or from a guess;
+5. **the window is the one you created**, by process id or handle — not merely one whose
+   title matches.
+
+```bash
+python scripts/preflight.py --pid 1234 --title "Notepad" [--point X,Y]
+```
+
+**Pass `--pid`.** Matching a window by its title finds a window that *looks* like the target,
+and that is not the same thing. During the trial that produced this skill, a run aimed at a
+freshly opened Notepad matched `.gitverse-token - Notepad` — a document the user had open,
+holding a credential — because one window contained the word and one match is all a substring
+search needs. Every other check passed. Nothing was typed only because the send call was
+failing for an unrelated reason.
+
+So the fifth check is **identity, not appearance**: hold the process or the handle of the window
+you created, and verify the window still belongs to it. Then pass `--pid` and let the check
+enforce it. Without it the preflight refuses, because a title match is a guess that has been
+right often enough to be dangerous.
 
 ```bash
 python scripts/preflight.py --title "Notepad" [--point X,Y]
@@ -203,7 +211,9 @@ it. Check the current state rather than guessing at it:
 - **Typing that produces the wrong text** under a non-Latin layout, because virtual keys were
   scanned through the current layout.
 - **A stale coordinate** used after the layout moved.
-- **An elevated agent** that could have asked and did not.
+- **A window matched by title rather than by identity**, which is how a run aimed at a
+  fresh document reaches one the user had open. The send call failing for an unrelated
+  reason is the only thing that stopped it.
 
 ## What this skill does not cover
 
