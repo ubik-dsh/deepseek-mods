@@ -38,7 +38,13 @@ are an AI agent working here, read this first.
 4. **Verify with evidence.** Run `node tools/boot-check.mjs` or
    `node tools/dev/verify-live.mjs` (both need a running `dsh web`) or a unit
    test; do not report success from reading code.
-5. **Keep both languages in sync.** Every user-facing document exists as
+5. **Install what you commit, and commit what you install.** A fix that lands in
+   `packages/` and never reaches `$DSH_HOME` changes nothing, and one that reaches
+   the home and never lands in `packages/` is lost on the next install. Run
+   `node tools/dev/check-deployed.mjs` after either, and commit as soon as a fix
+   is verified rather than batching it — drift between the two is invisible, because
+   the code keeps working and the panel looks the same.
+6. **Keep both languages in sync.** Every user-facing document exists as
    `X.md` (English) and `X.ru.md` (Russian).
 
 ## Cheat sheet
@@ -59,6 +65,7 @@ node tools/dev/test-mod-manager.mjs    # mod manager, host half
 node tools/dev/test-mod-manager-client.mjs  # mod manager, browser bundle
 node tools/dev/test-skill-manager.mjs       # skill manager, host half
 node tools/dev/test-skill-manager-client.mjs  # skill manager, browser bundle
+node tools/dev/check-deployed.mjs     # does the deployment match packages/?
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 node tools/dev/verify-skill-manager-roundtrip.mjs --skill <name>
