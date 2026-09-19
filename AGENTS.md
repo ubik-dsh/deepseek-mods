@@ -61,6 +61,9 @@ node tools/dev/test-skill-manager.mjs       # skill manager, host half
 node tools/dev/test-skill-manager-client.mjs  # skill manager, browser bundle
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
+node tools/dev/verify-skill-manager-roundtrip.mjs --skill <name>
+                                       # pauses, describes and resumes a real
+                                       # skill, restoring it afterwards
 node tools/dev/push-mirrors.mjs        # push to every published mirror
 ```
 

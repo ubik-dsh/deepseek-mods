@@ -107,6 +107,20 @@ whose `name` is not kebab-case, is longer than 64 characters, or **does not matc
 folder** is not registered, and DSH says nothing about it. The tab names the reason —
 otherwise a skill can sit in a root and never be offered, with no message anywhere.
 
+## A byte-order mark in front of the frontmatter
+
+Files written by PowerShell's `Set-Content -Encoding UTF8` begin with a UTF-8 BOM, and
+the frontmatter is matched from the very start of the file. A mark in front of `---`
+defeated both halves of this plugin: the read returned an empty description, so the
+panel showed a blank line, and the write returned false **in silence**, so saving a
+description appeared to work and changed nothing.
+
+Found by an end-to-end round trip against a fresh instance rather than by reading the
+code, and pinned by a regression test. A leading mark is now removed before matching
+and restored on write, so the file keeps the encoding it arrived with; and a file with
+no frontmatter at all is refused with a code rather than reporting a save that did not
+happen.
+
 ## Safety
 
 The route is reachable from the page, and a rename is not a thing to do to an

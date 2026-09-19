@@ -154,6 +154,47 @@ ok('the human summary round-trips',
 ok('the id is the skill name',
   registered.skills.find((s) => s.name === 'good-one')?.id === 'good-one')
 
+// ── a BOM in front of the frontmatter ─────────────────────────────────────────
+//
+// Found by the end-to-end round trip against a fresh instance, not by reading the
+// code, and it is the shape of file PowerShell writes: `Set-Content -Encoding UTF8`
+// puts a byte-order mark at the start. A mark in front of `---` defeated both the
+// read and the write — the read returned an empty description, so the panel showed a
+// blank line, and the write returned false in silence, so saving appeared to work and
+// changed nothing. This is the regression test for that.
+const bomDir = join(alpha, '.agents', 'skills', 'with-bom')
+mkdirSync(bomDir, { recursive: true })
+const BOM = '\ufeff'
+const bomFile = join(bomDir, 'SKILL.md')
+const bomOriginal = `${BOM}---\nname: with-bom\ndescription: Written by a tool that adds a byte-order mark.\n---\n\n# Body\n`
+writeFileSync(bomFile, bomOriginal, 'utf8')
+
+const bomSkill = MOD.snapshot().skills.find((skill) => skill.name === 'with-bom')
+ok('a skill whose file starts with a BOM is discovered', bomSkill !== undefined)
+ok('and its description is read, not left blank',
+  bomSkill?.description === 'Written by a tool that adds a byte-order mark.',
+  JSON.stringify(bomSkill?.description))
+
+const bomWritten = MOD.writeDescription(bomFile, 'A description written over a BOM.')
+ok('writing the description reports success rather than failing quietly',
+  bomWritten?.ok === true, JSON.stringify(bomWritten))
+const bomAfter = readFileSync(bomFile, 'utf8')
+ok('the new description is in the file', bomAfter.includes('A description written over a BOM.'))
+ok('the BOM was preserved, not quietly dropped', bomAfter.startsWith(BOM),
+  `starts with ${JSON.stringify(bomAfter.slice(0, 1))}`)
+ok('only the description line changed',
+  bomAfter.split('\n').filter((line, index) => line !== bomOriginal.split('\n')[index]).length === 1)
+ok('and the snapshot now reads the new description',
+  MOD.snapshot().skills.find((skill) => skill.name === 'with-bom')?.description
+    === 'A description written over a BOM.')
+
+// A file with no frontmatter at all cannot carry a description, and saying so beats
+// claiming a save that did nothing.
+const bareDir = join(alpha, '.agents', 'skills', 'no-frontmatter')
+const bareFile = join(bareDir, 'SKILL.md')
+ok('a file with no frontmatter is refused rather than silently ignored',
+  MOD.describe({ file: bareFile, modelDescription: 'x' }).code === 'no-frontmatter')
+
 // ── pause and resume ──────────────────────────────────────────────────────────
 
 ok('pause reports ok', MOD.toggle(target, 'pause').ok === true)

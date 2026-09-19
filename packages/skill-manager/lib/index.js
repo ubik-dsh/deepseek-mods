@@ -53,6 +53,19 @@ import { dirname, join, resolve, sep } from 'node:path'
 
 export const name = 'skill-manager'
 
+/**
+ * A UTF-8 byte-order mark, which PowerShell's `Set-Content -Encoding UTF8` writes and
+ * which almost nothing else does.
+ *
+ * It matters here because the frontmatter is matched from the very start of the file.
+ * A mark in front of `---` makes the read return an empty name and description — the
+ * panel shows a blank line where the description should be — and makes the write
+ * return false in silence, so saving a description appears to work and changes
+ * nothing at all. Removing it before matching and restoring it on write keeps the
+ * file's encoding exactly as it arrived.
+ */
+const BOM = '\ufeff'
+
 /** The host service the route needs. */
 export const inject = ['connection']
 
@@ -149,6 +162,7 @@ export function readFrontmatter(file) {
   } catch {
     return null
   }
+  if (text.startsWith(BOM)) text = text.slice(1)
   const match = /^(---\r?\n)([\s\S]*?)(\r?\n---)/.exec(text)
   if (match === null) return { name: '', description: '', hasFrontmatter: false }
   const lines = match[2].split(/\r?\n/)
@@ -183,9 +197,11 @@ export function readFrontmatter(file) {
  * of the frontmatter, the closing fence, the body.
  */
 export function writeDescription(file, description) {
-  const text = readFileSync(file, 'utf8')
+  const raw = readFileSync(file, 'utf8')
+  const mark = raw.startsWith(BOM) ? BOM : ''
+  const text = mark === '' ? raw : raw.slice(1)
   const match = /^(---\r?\n)([\s\S]*?)(\r?\n---)/.exec(text)
-  if (match === null) return false
+  if (match === null) return { ok: false, code: 'no-frontmatter' }
   const newline = match[1].endsWith('\r\n') ? '\r\n' : '\n'
   const body = match[2]
   const line = `description: ${JSON.stringify(description)}`
@@ -194,8 +210,8 @@ export function writeDescription(file, description) {
     : `${body}${newline}${line}`
   const before = text.slice(0, match.index)
   const after = text.slice(match.index + match[1].length + body.length)
-  writeFileSync(file, before + match[1] + rewritten + after, 'utf8')
-  return true
+  writeFileSync(file, mark + before + match[1] + rewritten + after, 'utf8')
+  return { ok: true }
 }
 
 /** The name rule DSH applies; a skill failing it is silently not registered. */
@@ -375,7 +391,11 @@ export function describe(payload) {
   const id = front.name !== '' ? front.name : 'unnamed'
 
   if (typeof modelDescription === 'string' && modelDescription.trim() !== '') {
-    writeDescription(file, modelDescription.trim())
+    const written = writeDescription(file, modelDescription.trim())
+    // Silent failure is what made this invisible: the panel said "saved" and the
+    // file was untouched. A file with no frontmatter block cannot carry a
+    // description, and that is worth saying rather than swallowing.
+    if (written.ok !== true) return { code: 'no-frontmatter' }
   }
   const registry = readRegistry()
   const previous = registry.skills[id] ?? {}
