@@ -32,9 +32,9 @@ window.__ModuleLoader__.load({
 		const NS = "skill-scout";
 
 		const en = {
-			tab: "Skill scout",
-			title: "Skill scout",
-			subtitle: "Ask for a search. An agent runs it, puts the survivors on trial, and files them here.",
+			tab: "Collection",
+			title: "Collection of found skills",
+			subtitle: "Skills already found and judged. Each carries what the hearing decided, its rating, and the date it entered. The scout reads this before it searches, so nothing is hunted for twice.",
 			ask: "What to look for",
 			askHint: "A description, not keywords — the scout turns it into words and their synonyms itself. \"A skill that drives a Windows program with no API\" is better than \"windows automation\".",
 			askPlaceholder: "e.g. a skill for evaluating other skills before adopting them",
@@ -73,7 +73,7 @@ window.__ModuleLoader__.load({
 			added: "Added",
 			forget: "Forget",
 			noteKeep: "Worth keeping is the verdict of the hearing. Runs here is a separate question — a good skill for a mechanism this Harness does not have is good and unusable, and one score would hide that.",
-			noteStore: "This is a store, not a search. The scout reads it first and only then goes to GitHub, so a skill found once is never hunted for again.",
+			noteCollector: "This is a store, not a search. The scout reads it first and only then goes to GitHub, so a skill found once is never hunted for again.",
 			noteQueue: "The tab is a board, not a worker. It writes the task; an agent runs the search, because searching needs a token and the network and neither belongs behind a button in a browser.",
 			noteAdd: "Adding is a person's decision and the only way anything is adopted.",
 			refresh: "Refresh",
@@ -91,9 +91,9 @@ window.__ModuleLoader__.load({
 		};
 
 		const ru = {
-			tab: "Скаут скиллов",
-			title: "Скаут скиллов",
-			subtitle: "Попроси поиск. Агент его выполнит, выживших отдаст под суд и положит сюда.",
+			tab: "Коллекция",
+			title: "Коллекция найденных скиллов",
+			subtitle: "Уже найденные и отсуженные скиллы. У каждого — вердикт суда, рейтинг и дата попадания. Скаут читает это ДО поиска, поэтому дважды ничего не ищется.",
 			ask: "Что искать",
 			askHint: "Опиши задачу, а не ключевые слова — разведчик сам превратит её в слова и синонимы. «Скилл, который управляет программой Windows без API» лучше, чем «windows automation».",
 			askPlaceholder: "например: скилл для оценки других скиллов перед тем, как их брать",
@@ -132,7 +132,7 @@ window.__ModuleLoader__.load({
 			added: "Добавлено",
 			forget: "Забыть",
 			noteKeep: "«Стоит держать» — вердикт суда. «Работает здесь» — отдельный вопрос: хороший скилл для механизма, которого в этом Harness нет, хорош и неприменим, и одна оценка это скрыла бы.",
-			noteStore: "Это запасник, а не поиск. Скаут читает его первым и только потом идёт на GitHub, поэтому найденное однажды больше не ищется.",
+			noteCollector: "Это запасник, а не поиск. Скаут читает его первым и только потом идёт на GitHub, поэтому найденное однажды больше не ищется.",
 			noteQueue: "Вкладка — доска, а не работник. Она пишет задание; поиск выполняет агент, потому что для поиска нужен токен и сеть, и ни то ни другое не должно стоять за кнопкой в браузере.",
 			noteAdd: "Ничего не принимается нажатием и единственный способ что-либо принять.",
 			refresh: "Обновить",
@@ -398,55 +398,11 @@ window.__ModuleLoader__.load({
 					refreshedAt !== null ? h("span", { style: styles.stamp }, `${t("updatedAt")} ${refreshedAt}`) : null,
 					h(primitives.Button, { variant: "outline", disabled: busy, onClick: () => { load(); } }, t("refresh"))));
 
-			// ── the task field ────────────────────────────────────────────────
-			const ask = h("div", { style: styles.section, key: "ask" },
-				h("div", { style: styles.sectionName }, t("ask")),
-				h("textarea", {
-					style: { ...styles.input, minHeight: "62px" },
-					value: text,
-					disabled: busy,
-					placeholder: t("askPlaceholder"),
-					onChange: (event) => { setText(event.target.value); },
-				}),
-				h("div", { style: styles.hint }, t("askHint")),
-				h("div", { style: styles.row },
-					h(primitives.Button, { variant: "outline", disabled: busy, onClick: submit }, t("search"))));
-
-			const body = [ask];
-
-			// ── the queue ─────────────────────────────────────────────────────
-			const queueSection = [h("div", { style: styles.sectionName, key: "n" },
-				`${t("queue")}${state === null ? "" : ` · ${String(state.pending)} ${t("status")}`}`)];
-			if (state !== null && state.tasks.length === 0) {
-				queueSection.push(h("div", { style: styles.empty, key: "e" }, t("queueEmpty")));
-			}
-			for (const task of state?.tasks ?? []) {
-				const counts = [["found", task.found], ["triaged", task.triaged],
-					["judged", task.judged], ["addedCount", task.added]]
-					.filter(([, value]) => typeof value === "number" && value > 0)
-					.map(([key, value]) => `${t(key)} ${String(value)}`).join(" · ");
-				queueSection.push(h("div", { style: styles.card, key: task.id },
-					h("div", { style: styles.cardHeader },
-						h("div", { style: styles.cardMain },
-							h("div", { style: styles.summary }, task.text),
-							h("div", { style: styles.meta },
-								`${t("askedBy")} ${task.by} · ${task.createdAt.slice(0, 16).replace("T", " ")}${counts ? ` · ${counts}` : ""}`),
-							task.note ? h("div", { style: styles.hint }, task.note) : null),
-						h("div", { style: styles.cardRight },
-							h(primitives.Tag, { tone: STATUS_TONE[task.status] ?? "neutral" },
-								t(`status_${task.status}`) ?? task.status),
-							task.status === "pending"
-								? h(primitives.Button, {
-									variant: "outline", disabled: busy, key: "take",
-									onClick: () => { run({ action: "claim", id: task.id }); },
-								}, t("take"))
-								: null,
-							h(primitives.Button, {
-								variant: "ghost", disabled: busy, key: "dismiss",
-								onClick: () => { run({ action: "dismiss", id: task.id }); },
-							}, t("dismiss"))))));
-			}
-			body.push(h("div", { style: styles.section, key: "queue" }, ...queueSection));
+			// The tab holds no task field and no queue on purpose. Asking for a search is
+			// a sentence to the scout, and the scout is a skill — the board that used to
+			// live here was a second way to do the same thing, with its own state to go
+			// stale. What is left is the collection itself.
+			const body = [];
 
 			// ── the catalogue ─────────────────────────────────────────────────
 			const catalogueSection = [h("div", { style: styles.sectionName, key: "n" },
@@ -539,8 +495,7 @@ window.__ModuleLoader__.load({
 			}
 
 			body.push(h("div", { style: styles.notes, key: "notes" },
-				h("div", { key: "n0" }, t("noteStore")),
-				h("div", { key: "n1" }, t("noteQueue")),
+				h("div", { key: "n0" }, t("noteCollector")),
 				h("div", { key: "n2" }, t("noteKeep")),
 				h("div", { key: "n3" }, t("noteAdd"))));
 

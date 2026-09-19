@@ -13,7 +13,7 @@ are an AI agent working here, read this first.
 - `packages/skill-manager/` — a dual-face plugin: a Settings tab that lists the
   skills this Harness resolves, gives each a model-facing description and a
   one-line human summary, and pauses or resumes it by renaming the file DSH reads.
-- `packages/skill-scout/` — a dual-face plugin: a Settings tab that is the **store of
+- `packages/skill-scout/` — a dual-face plugin: a Settings tab that is the **collection of
   finds** — skills already found and judged, each with its source, description, two
   axes (worth keeping, runs here), the hearing's rating and the date it entered. The
   scout reads it before it searches, so a skill found once is not hunted for again.

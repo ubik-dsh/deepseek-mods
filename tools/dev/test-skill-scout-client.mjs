@@ -157,7 +157,7 @@ ok('it has its own id', tab?.options?.id === 'skill-scout', String(tab?.options?
 ok('it sorts after the Skills tab', tab?.options?.order === 31, String(tab?.options?.order))
 ok('the tab carries a channel into the chat', tab?.options?.channel !== undefined,
   'a root-scoped tab cannot call conversation.send directly')
-ok('the label resolves in Russian from the DOM language', tab?.options?.label() === 'Скаут скиллов',
+ok('the label resolves in Russian from the DOM language', tab?.options?.label() === 'Коллекция',
   String(tab?.options?.label()))
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -182,15 +182,14 @@ const textOf = (node) => (typeof node?.props?.children === 'string' ? node.props
 const texts = nodes.map(textOf).filter((value) => value !== undefined)
 
 ok('the board rendered', nodes.length > 20, `${String(nodes.length)} nodes`)
-ok('the task field is there', nodes.some((node) => node.type === 'textarea'))
-ok('the search button is there', texts.includes('Отправить разведчика'))
-ok('the pending task is shown', texts.some((value) => value.includes('nobody has taken yet')),
-  texts.find((v) => v.includes('taken yet')) ?? 'not found')
-ok('the finished task is shown with what it produced',
-  texts.some((value) => value.includes('найдено 41')), texts.find((v) => v.includes('найдено')) ?? 'not found')
-ok('the Take button is offered only for a pending task',
-  texts.filter((value) => value === 'Взять').length === 1,
-  `${String(texts.filter((value) => value === 'Взять').length)} offered`)
+// The tab is a collection, not a board. Asking for a search is a sentence to the
+// scout, and the scout is a skill — a task field here was a second way to do the same
+// thing, with its own state to go stale.
+ok('there is no task field', !nodes.some((node) => node.type === 'textarea'))
+ok('and no search button', !texts.includes('Отправить разведчика'))
+ok('and no queue is rendered', !texts.some((value) => value.includes('nobody has taken yet')))
+ok('and no task counts either', !texts.some((value) => value.includes('найдено 41')))
+ok('and no Take button', !texts.includes('Взять'))
 ok('both catalogue entries are shown', texts.includes('gateguard') && texts.includes('keepme'))
 ok('the adopted one is marked', texts.includes('Добавлено'))
 
@@ -221,7 +220,10 @@ ok('so is the verdict of the hearing',
 ok('and what was taken from it',
   expandedTexts.some((value) => value.includes('state the facts before the first edit')))
 
-ok('the notes explain that the tab is a board', texts.some((value) => value.includes('доска, а не работник')))
+ok('the notes explain that it is a collection, not a search',
+  texts.some((value) => value.includes('Это запасник, а не поиск')),
+  texts.find((v) => v.includes('запасник')) ?? 'not found')
+ok('the title says what it collects', tab?.options?.label() === 'Коллекция')
 ok('the notes say nothing is adopted by a click',
   texts.some((value) => value.includes('Ничего не принимается нажатием')),
   texts.find((v) => v.includes('нажати')) ?? 'not found')

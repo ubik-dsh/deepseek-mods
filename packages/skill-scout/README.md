@@ -1,7 +1,7 @@
 # Skill scout
 
-A DSH plugin adding a **Found skills** tab to *Settings → Plugins*, one step after
-**Skills**. It is the **store** of skills already found and judged, and it is what makes
+A DSH plugin adding a **Collection** tab to *Settings → Plugins*, one step after
+**Skills**. It is the **collection** of skills already found and judged, and it is what makes
 the search accumulate: the scout reads it *before* it searches, so a skill found once is
 never hunted for again.
 
