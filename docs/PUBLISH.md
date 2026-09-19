@@ -141,9 +141,21 @@ Already covered by `.gitignore`, but worth knowing:
 | `$DSH_HOME/.credentials.yaml` | API keys and the browser-session signing secret — **a leak** |
 | `node_modules/` | often a junction into the DSH home |
 | `_edge-profile*/`, `*.log` | artefacts of the verification harness |
+| anything named like a token | pushing needs a credential, so the credential ends up near the thing being pushed — save it in a directory that is not a repository |
 
 If you ever commit a credentials file by accident, revoke the key immediately:
 removing the file from a later commit does not remove it from history.
+
+### Keep the tokens outside the repository
+
+`tools/dev/push-mirrors.mjs` reads them from `~/.dsh-mirror-tokens/<host>`, or
+from wherever `$GITVERSE_TOKEN_FILE` and `$GITHUB_TOKEN_FILE` point. Anywhere but
+inside the checkout.
+
+This has already gone wrong once here, twice over: a token saved into the
+repository was swept up by `git add -A`, and GitHub's push protection rejected
+the push — which is a backstop, not a plan. The `.gitignore` rules for
+token-shaped names came afterwards, from that.
 
 ## Publishing without git
 
