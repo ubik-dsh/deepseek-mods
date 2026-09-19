@@ -207,10 +207,36 @@ ok('the paused skill is shown too', texts.includes('paused-one'))
 
 const summaryNode = nodes.find((node) => textOf(node) === 'Ищет готовый скилл, прежде чем писать новый.')
 ok('the summary is rendered as its own element', summaryNode !== undefined)
-ok('and it is rendered large', Number.parseFloat(summaryNode?.props?.style?.fontSize) >= 20,
+// Modest on purpose. An earlier change doubled this to 24px, which was the wrong
+// reading of a request to make the panel clearer: what needed more was the amount of
+// explanation under each field, not the size of the type.
+ok('the summary is rendered at a readable but modest size',
+  Number.parseFloat(summaryNode?.props?.style?.fontSize) >= 12
+  && Number.parseFloat(summaryNode?.props?.style?.fontSize) <= 16,
   `fontSize=${String(summaryNode?.props?.style?.fontSize)}`)
-ok('and it is not faded out', Number(summaryNode?.props?.style?.opacity ?? 1) >= 0.9,
+ok('and it is not washed out', Number(summaryNode?.props?.style?.opacity ?? 1) >= 0.7,
   `opacity=${String(summaryNode?.props?.style?.opacity)}`)
+
+// ── the field hints: the amount of text, which is what was actually asked for ──
+
+const en = registered.locale[0].dictionaries.en
+const ru = registered.locale[0].dictionaries.ru
+ok('the model hint says where the text is written', ru.modelHint.includes('description'))
+ok('the model hint says nothing else in the file changes',
+  ru.modelHint.includes('Больше в файле не меняется ничего'))
+ok('the model hint says who it is written for', ru.modelHint.includes('для модели'))
+ok('the model hint is substantial, not a caption', ru.modelHint.length >= 320,
+  `${String(ru.modelHint.length)} chars`)
+ok('the human hint says a model never reads it', ru.humanHint.includes('Модель его не читает'))
+ok('the human hint says where it is kept', ru.humanHint.includes('реестр'))
+ok('the human hint explains what it is for', ru.humanHint.includes('для вас'))
+ok('the human hint is substantial too', ru.humanHint.length >= 250,
+  `${String(ru.humanHint.length)} chars`)
+ok('the English hints are as detailed as the Russian ones',
+  en.modelHint.length >= 320 && en.humanHint.length >= 250,
+  `en model=${String(en.modelHint.length)}, en human=${String(en.humanHint.length)}`)
+ok('the two languages carry the same keys, hint sizes aside',
+  JSON.stringify(Object.keys(en).sort()) === JSON.stringify(Object.keys(ru).sort()))
 
 // A skill with no human summary must still show a readable line, taken from the
 // model description — that is the case the panel was unreadable for.

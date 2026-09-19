@@ -11,12 +11,14 @@ A card is the same shape as a mod card and is built from the same elements —
 when it is paused**, the way every other element in DSH reads, rather than like
 something imitating it.
 
-Each card leads with **one big readable line** saying what the skill is for — the
-human summary when a skill has one, otherwise the first sentence of the
-model-facing description. It was 12px at 72% opacity in the first version, which
-listed twenty skills without saying what any of them did; it is now roughly twice
-the size at full opacity. The whole of the model description is one click away in
-the expanded card.
+Each card leads with one line saying what the skill is for — the human summary when
+a skill has one, otherwise the first sentence of the model-facing description. The
+whole of the model description is one click away in the expanded card.
+
+The two fields in that card carry a paragraph of explanation each rather than a
+caption, because the difference between them is the whole point: one text is what
+DSH matches a request against and is written into the skill file, the other is never
+read by a model and exists so that a person can recognise the skill later.
 
 The plate **is** the switch: pressing it pauses or resumes. The chevron opens the
 card, where the root, rank, path, size, both descriptions and the registration form

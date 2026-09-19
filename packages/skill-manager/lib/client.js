@@ -64,9 +64,9 @@ window.__ModuleLoader__.load({
 			shadowHint: "Another root wins resolution for this name, so this copy is not the one served.",
 			modelDescription: "Description for the model",
 			modelDescriptionFull: "Full description for the model",
-			modelHint: "This is the text DSH matches a request against, and it is written straight into the skill's frontmatter. Nothing else in the file is touched.",
+			modelHint: "DSH matches a request against this text and nothing else, and it is written straight into the skill's frontmatter — the description line between the --- markers. Nothing else in the file changes: the body, the other frontmatter fields and the line endings all stay as they were. Write it for a model, not for a person: what the skill does, which requests should reach for it, and what it does not cover. The model sees this text in its skill list before every request, so the clearer the boundary you draw, the less often the skill is picked up for the wrong job.",
 			humanSummary: "One line for a person",
-			humanHint: "Kept in the registry beside this panel. No model ever reads it.",
+			humanHint: "Kept in the registry beside this panel and never written into the skill file. No model reads it — it is here for you: so that in a month, looking down the list, you can tell at a glance what each skill is for and which ones you actually use. One sentence in your own words is enough. Leave it empty and the card falls back to the first sentence of the model description instead.",
 			save: "Save",
 			saved: "Saved.",
 			registered: "registered",
@@ -112,9 +112,9 @@ window.__ModuleLoader__.load({
 			shadowHint: "Другой корень выигрывает разрешение этого имени, поэтому отдаётся не эта копия.",
 			modelDescription: "Описание для модели",
 			modelDescriptionFull: "Полное описание для модели",
-			modelHint: "Именно по этому тексту DSH сопоставляет запрос, и он записывается прямо в шапку скилла. Больше в файле ничего не трогается.",
+			modelHint: "Именно по этому тексту DSH сопоставляет запрос, и он записывается прямо в шапку скилла — в строку description между маркерами ---. Больше в файле не меняется ничего: тело скилла, остальные поля шапки и переводы строк остаются как были. Пишите это для модели, а не для человека: что скилл умеет, при каких запросах его стоит брать и чего он не делает. Модель видит этот текст в своём списке скиллов перед каждым запросом, поэтому чем яснее вы очертите границу применимости, тем реже скилл возьмут не для той задачи.",
 			humanSummary: "Кратко для человека",
-			humanHint: "Хранится в реестре рядом с этой панелью. Модель его не читает никогда.",
+			humanHint: "Хранится в реестре рядом с этой панелью и в файл скилла не попадает никогда. Модель его не читает — эта строка для вас: чтобы через месяц, глядя на список, сразу понимать, зачем здесь тот или иной скилл и какими вы пользуетесь. Достаточно одного предложения своими словами. Оставите пустым — карточка покажет первое предложение описания для модели.",
 			save: "Сохранить",
 			saved: "Сохранено.",
 			registered: "в реестре",
@@ -239,12 +239,10 @@ window.__ModuleLoader__.load({
 				opacity: 0.75,
 				wordBreak: "break-all",
 			},
-			// The line a person actually reads to find out what a skill does. It was
-			// 12px at 72% opacity — the size of a footnote, and it read like one: the
-			// panel listed twenty skills and none of them said what it was for.
-			// Roughly doubled and brought up to full opacity, because this text is the
-			// reason the tab exists.
-			summary: { fontSize: "24px", lineHeight: 1.3, marginTop: "5px", opacity: 0.95 },
+			// Back to the original size. The first attempt at "make it readable" doubled
+			// this, and that was the wrong reading of the request: what needed more was
+			// the *amount* of explanation under each field, not the size of the type.
+			summary: { fontSize: "12.5px", lineHeight: 1.45, marginTop: "3px", opacity: 0.78 },
 			human: { fontSize: "13px", opacity: 0.9, marginTop: "3px", fontStyle: "italic" },
 			dot: { display: "inline-flex", alignItems: "center" },
 			chevron: { display: "inline-flex", opacity: 0.55, transition: "transform .15s ease" },
