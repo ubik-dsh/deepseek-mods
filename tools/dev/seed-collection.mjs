@@ -50,6 +50,14 @@ const DISPOSITION = [
   ['verify metadata before composing a query', 'checklist', 'before writing a query against an unknown schema', 'a way to read the schema'],
   ['the 1C traps that the documentation buries', 'checklist', 'when writing a 1C query with compound types', 'a 1C system'],
   ['the base-selection order', 'script', 'when a 1C base has to be chosen', '1C installed and a project file'],
+  ['ConvertTo-Json without -Depth', 'rule', 'whenever serialising an object to JSON in PowerShell', 'PowerShell'],
+  ['the script template', 'checklist', 'when writing any PowerShell script', 'nothing'],
+  ['one call per DECISION POINT', 'rule', 'when driving a graphical interface', 'an interface to drive'],
+  ['the input ladder with a foreground-first rule', 'rule', 'when synthetic input has to reach an application', 'a way to focus a window'],
+  ['write generated task scripts to the tool', 'rule', 'when a script is written to drive something', 'nothing'],
+  ['the exact PowerShell invocation', 'rule', 'when launching a PowerShell script', 'PowerShell'],
+  ['the WScript.Shell COM shortcut creation', 'script', 'when a shortcut has to be created', 'Windows and a COM shell'],
+  ['the CMD trap that chcp 65001 breaks', 'rule', 'when a batch file must handle non-ASCII input', 'CMD'],
   ['the two parameters that drive 1C', 'script', 'when an agent must operate 1C, not merely open it', '1C installed'],
 ]
 
@@ -199,6 +207,55 @@ const ENTRIES = [
       'the two parameters that drive 1C rather than merely open it: run an external data processor, and open a navigational link straight to an object',
     ],
     note: 'It is a README for one PowerShell file: every rule lives in the script, and the body only resolves arguments. It also passes a password as a command-line argument, which is readable by other processes, and it returns control before knowing whether 1C started — so the agent cannot tell success from silence.',
+  },
+
+  // ── Windows. 215 repositories carry a SKILL.md for it. Three were chosen for having
+  //    no coupling to another harness, and the first of them is the first skill in ten
+  //    hearings that is APPLICABLE rather than a source of parts.
+  {
+    name: 'powershell-windows-master',
+    repo: 'raphaol/powershell-windows-best-skill',
+    path: 'SKILL.md',
+    description: 'PowerShell rules and traps for Windows: parentheses around every cmdlet call used with a logical operator, null checks before property access, avoiding nested expressions in strings, always passing -Depth to ConvertTo-Json, ASCII-only output, and a script template with a documented parameter header.',
+    keep: 'with a boundary',
+    runsHere: 'yes',
+    hearing: { prosecutor: 5, defence: 6, verdict: 'keep with a boundary', cases: 12 },
+    taken: [
+      'the opening trap list, and above all ConvertTo-Json without -Depth, which silently truncates nested objects: a data-loss bug with no error message',
+      'the script template: #Requires, then .SYNOPSIS, .DESCRIPTION, .PARAMETER, .EXAMPLE — a header shape rather than advice',
+    ],
+    boundary: 'The syntax rules and the template apply as written. The ASCII-only rule applies where the console is Windows PowerShell 5.1, which is what a bare powershell.exe call gets — and this file also carries #Requires -Version 7.0, which handles UTF-8 natively. The two lines disagree, so the rule is kept with the condition attached rather than as law. The reference sections past the traps go stale and are not taken.',
+    note: 'The first skill of ten whose defence won. It needs nothing from another harness - 72 Windows-native signals against one mention of Claude - and the trap list is exactly what a skill is for: behaviours that surprise, each with a wrong/right pair. The ASCII rule is one we learned the hard way, having had PowerShell 5.1 corrupt Cyrillic and add a byte-order mark in this very repository.',
+  },
+  {
+    name: 'windows-harness',
+    repo: 'browser-use/windows-harness',
+    path: 'src/windows_harness/SKILL.md',
+    description: 'Drive a whole Windows desktop from one persistent Python session: foreground-first input with focus holding and SendInput plus pen and message fallbacks, background screenshots, UI Automation, clipboard paste, and filesystem access, invoked as one CLI call per decision point.',
+    keep: 'no',
+    runsHere: 'after porting',
+    hearing: { prosecutor: 7, defence: 4, verdict: 'reject the skill, take these parts', cases: 12 },
+    taken: [
+      'one call per DECISION POINT and not per primitive — the economics of driving an interface, independent of whose binary does it',
+      'the input ladder with a foreground-first rule and named fallbacks, which is the shape we arrived at the hard way after mouse_event and keybd_event failed to reach a XAML application',
+      'write generated task scripts to the tool\'s own scripts directory and never into the working tree, because they pollute the user\'s repository and show up as untracked files — a rule this session broke repeatedly',
+    ],
+    note: 'It is the manual for a CLI that is not installed here, so not one line is executable without it — win.see, element_index and windows-harness doctor are one product\'s surface. What transfers is the discipline of driving an interface, which is not the same thing as the tool that does it.',
+  },
+  {
+    name: 'windows-automation',
+    repo: 'Lucien-1127/strata-skill',
+    path: 'windows-automation/SKILL.md',
+    description: 'Choosing PowerShell over CMD batch for Windows scripting, with a comparison table of encoding, input, control flow and error handling; launching scripts from a desktop shortcut; and the argument shape for invoking PowerShell with no profile and a bypassed execution policy.',
+    keep: 'no',
+    runsHere: 'yes',
+    hearing: { prosecutor: 6, defence: 5, verdict: 'reject the skill, take these parts', cases: 12 },
+    taken: [
+      'the exact PowerShell invocation that most people get wrong: -NoProfile -ExecutionPolicy Bypass -File, with the reason each flag is there',
+      'the WScript.Shell COM shortcut creation, five correct lines, being the only way to make a working .lnk from a script',
+      'the CMD trap that chcp 65001 breaks set /p — specific, checkable, and the reason the encoding workaround is worse than the thing it fixes',
+    ],
+    note: 'Its centre is a table arguing a settled question: nobody is choosing between PowerShell and CMD batch in 2026. And launching from a desktop shortcut is an end-user concern rather than an agent one. The three pieces above are correct and reusable; the argument around them is not.',
   },
 
 ]
