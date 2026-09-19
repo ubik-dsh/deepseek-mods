@@ -38,3 +38,9 @@ locale-en.json
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Python bytecode. A skill is plain text; a compiled cache is neither readable
+# nor part of the work, and it was committed here once by accident.
+__pycache__/
+*.pyc
+*.pyo
