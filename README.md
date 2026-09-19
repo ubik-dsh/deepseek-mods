@@ -40,6 +40,24 @@ its host route stopped answering, the badge reads "off" and the button became
 
 ---
 
+## What is different here
+
+Most collections list what they contain. This is what is different about this
+one, written so that it can be checked rather than believed.
+
+| | |
+|---|---|
+| **Verification with the evidence published** | Every claim in these docs was measured, and [`docs/VERIFICATION.md`](docs/VERIFICATION.md) is the table: what was run, what it returned, and — the column most projects leave out — **what was not covered**. |
+| **Honest failure paths** | A mod that will not install says which check failed and what to do about it. The mirror script refuses to push a token saved for the wrong host. The skills checker reports what it cannot prove as a warning instead of a failure. |
+| **Bilingual from the start** | Every user-facing file exists as `X.md` and `X.ru.md`. The Russian pack is a generated bundle of 1257 strings with its own test, not a hand-edited translation. |
+| **Tests that are allowed to fail** | A browser test here caught a re-render loop that a naive stub could not see; the **stub** was fixed, not the test. When a check asserts something inconvenient, the check is examined rather than lowered. |
+| **No build step** | Plain JavaScript packages. No compiler, no bundler, no network access at install time. |
+
+What this repository does **not** claim is that any of it is a new idea. Plugin
+managers exist elsewhere. What is uncommon is the verification discipline — and
+the Russian localization, which a scan of the main DSH catalogues found to be an
+empty niche.
+
 ## Requirements
 
 - **DeepSeek Harness** installed and able to run `dsh web`. Tested against **0.1.5-rc.2**.
@@ -147,6 +165,24 @@ until an explicit choice is stored.
 
 Anything not translated falls back to English per key, so a partial or outdated
 pack degrades gracefully instead of leaving blanks.
+
+## Skills
+
+Skills are not mods: no install, no restart, no plugin row. A skill is a folder
+of instructions an agent reads when a task matches it, and several harnesses —
+DSH, Claude Code and others — read the same `SKILL.md` format.
+
+| Skill | What it does |
+|---|---|
+| **[create-a-skill](.agents/skills/create-a-skill)** | Teaches an agent to write a good skill, and to measure whether it works. Assembled from every skill about skill authoring published in a repository with 5000+ stars, then extended with what none of them had: a **bundled checklist runner** (`scripts/check-skill.py`, standard library only) and a **measured evaluation protocol**. |
+
+Copy the folder into your harness's skills root and it is live — see
+[Where it goes](.agents/skills/create-a-skill/references/harness-locations.md)
+for DSH's seven roots and the conventions of other harnesses.
+
+Plain text, no binaries, nothing to build. The one Python file is a checker that
+reads the standard library and nothing else, so the skill stays usable in any
+harness even if you delete it.
 
 ## Uninstall
 

@@ -1,7 +1,8 @@
 ---
 name: create-a-skill
-description: Author a new DSH skill, or improve an existing one — a folder of instructions an agent loads on demand. Use when the user asks you to learn a tool, a site, or a workflow and keep it for later; says "make yourself a skill for X"; asks to write, fix, review, or evaluate a skill; or wants a repeated procedure turned into something reusable.
+description: Author a new agent skill, or improve an existing one — a folder of instructions an agent loads on demand, from a SKILL.md that works in DeepSeek Harness, Claude Code and any other harness reading the Agent Skills standard. Ships a bundled checklist runner and a measured evaluation protocol, not just advice. Use when the user asks you to learn a tool, a site, or a workflow and keep it for later; says "make yourself a skill for X"; asks to write, fix, review, or evaluate a skill; or wants a repeated procedure turned into something reusable.
 license: MIT
+compatibility: Agent Skills standard. SKILL.md is plain text with no runtime; only scripts/check-skill.py needs Python 3.8 or newer, standard library.
 metadata:
   spec: https://agentskills.io/specification
   assembled_from: anthropics/skills (skill-creator), mattpocock via alirezarezvani/claude-skills (write-a-skill), sickn33/agentic-awesome-skills (effective-agent-skills, writing-skills, verification-before-completion), deanpeters/Product-Manager-Skills
@@ -30,26 +31,15 @@ wraps a tool nor changes how work is done, do not write it.
 
 ## Where it goes, and what the file is called
 
-DSH reads skills from seven roots. Ranks run 100 to 600 and **the lower rank
-wins** when two offer the same name.
-
-| Root | Rank | Use it for |
-|---|---|---|
-| `<project>/.dsh/skills` | 100 | a project's own skills |
-| `<project>/.agents/skills` | 200 | skills that travel with a repository — **prefer this** |
-| a runtime registration | 250 | skills a plugin registers while running |
-| custom roots, if configured | 300 | an installation's own arrangement |
-| `$DSH_HOME/skills` | 400 | one person's skills, for every project |
-| `$DSH_AGENTS_HOME`, default `~/.agents`, then `/skills` | 500 | shared across a machine's agents |
-| the bundled directory | 600 | shipped with the harness, and trusted |
-
-All are watched: write the file and the skill exists, with no restart.
+A harness decides where it looks for skills; the format does not. **Prefer
+`.agents/skills/<name>/`** — several harnesses read that name, so a repository
+that carries it gives every agent that opens it the same capability.
 
 ```
 .agents/skills/
   create-a-skill/
     SKILL.md            ← required, and the name must be exactly this
-    references/         ← detail loaded only when needed (see below)
+    references/         ← detail loaded only when needed
     scripts/            ← deterministic work the body will invoke
     assets/             ← templates, images, data
   quick-note.md         ← a flat file, for a skill with nothing to bundle
@@ -58,6 +48,12 @@ All are watched: write the file and the skill exists, with no restart.
 `name` must match the folder exactly, be 1–64 characters of `a-z`, digits and
 single hyphens, and not begin, end or double up on a hyphen. A wrong name is
 **ignored in silence** — no error reaches the conversation, only the log.
+
+Where *your* harness looks, including the seven roots and precedence ranks
+measured for DSH and the conventions of several others:
+[references/harness-locations.md](references/harness-locations.md). Confirm it by
+observation rather than documentation — write the file, then ask the session for
+its catalogue. Documentation describes the version its author had.
 
 ## Frontmatter
 
