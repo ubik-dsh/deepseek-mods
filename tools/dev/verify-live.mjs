@@ -155,6 +155,31 @@ record(
     : `HTTP ${String(skillRoute.status)} — the row is not mounted; restart \`dsh web\` if it was added while the server was running after a failed import`,
 )
 
+// 8. the store of finds. Nothing enters it without a verdict, so a store this
+//    young being empty is the correct answer rather than a failure.
+const scoutRoute = await fetch(`${base}/api/skill-scout.mod`, {
+  headers: { cookie, accept: 'application/json' },
+}).catch(() => null)
+let scoutBody = null
+try {
+  scoutBody = await scoutRoute?.json()
+} catch {}
+const scoutState = scoutBody?.state
+const scoutShaped = scoutState !== undefined
+  && Array.isArray(scoutState.tasks)
+  && Array.isArray(scoutState.entries)
+  && typeof scoutState.cataloguePath === 'string'
+record(
+  'the store of finds answers with its queue and catalogue',
+  scoutRoute?.status === 200 && scoutBody?.ok === true && scoutShaped,
+  scoutRoute?.status === 200
+    ? `HTTP 200, ${String(scoutState?.entries?.length ?? 0)} find(s), `
+      + `${String(scoutState?.tasks?.length ?? 0)} task(s), `
+      + `${String(scoutState?.adopted ?? 0)} adopted`
+    : `HTTP ${String(scoutRoute?.status)} - the row is not mounted; restart `
+      + '`dsh web` if it was installed while the server was running',
+)
+
 // verdict
 const failed = results.filter((result) => !result.ok)
 console.log('')

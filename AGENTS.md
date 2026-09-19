@@ -13,10 +13,12 @@ are an AI agent working here, read this first.
 - `packages/skill-manager/` — a dual-face plugin: a Settings tab that lists the
   skills this Harness resolves, gives each a model-facing description and a
   one-line human summary, and pauses or resumes it by renaming the file DSH reads.
-- `packages/skill-scout/` — a dual-face plugin: a Settings tab that is a **board** for
-  finding skills. Anyone writes what to look for, an agent runs the search and puts
-  the survivors on trial, and what was decided is filed with two axes — worth keeping,
-  and runs here — plus the rating and the source link. Adoption is a person's.
+- `packages/skill-scout/` — a dual-face plugin: a Settings tab that is the **store of
+  finds** — skills already found and judged, each with its source, description, two
+  axes (worth keeping, runs here), the hearing's rating and the date it entered. The
+  scout reads it before it searches, so a skill found once is not hunted for again.
+  **Nothing enters it without a verdict.** Adoption happens in the chat: the button
+  raises the skill with the agent, and a person says install it or leave it.
 - `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
   the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
@@ -74,6 +76,8 @@ node tools/dev/test-skill-scout-client.mjs # skill scout, browser bundle
 node tools/dev/check-deployed.mjs     # does the deployment match packages/?
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
+node tools/dev/verify-store-live.mjs      # the store of finds, live: task,
+                                       # verdict gate, adopt, discuss, remove
 node tools/dev/verify-skill-manager-roundtrip.mjs --skill <name>
                                        # pauses, describes and resumes a real
                                        # skill, restoring it afterwards
