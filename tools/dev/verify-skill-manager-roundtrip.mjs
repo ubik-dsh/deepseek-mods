@@ -74,13 +74,22 @@ if (skill === undefined) {
 const activePath = skill.file
 const pausedPath = `${activePath}.paused`
 const startedPaused = skill.paused
+const startedRegistered = skill.registered === true
 const originalBytes = existsSync(activePath) ? readFileSync(activePath, 'utf8') : null
-const originalDescription = skill.description
-console.log(`  testing '${skillName}', currently ${startedPaused ? 'paused' : 'active'}`)
+console.log(`  testing '${skillName}', currently ${startedPaused ? 'paused' : 'active'}${startedRegistered ? ', registered' : ''}`)
 console.log(`    ${activePath}`)
 console.log('')
 
-/** Put the skill back the way it was found, whatever happened. */
+/**
+ * Put the skill back the way it was found, whatever happened.
+ *
+ * The first version of this restored the file and the pause state and stopped there,
+ * which left something behind: describing a skill writes a **registry entry**, and a
+ * skill that was not registered before the run was left registered after it. A stale
+ * entry naming a skill that no longer exists is invisible in the panel and still
+ * wrong, and "restores what it changed" is not true if it only restores two of the
+ * three things.
+ */
 const restore = async () => {
   const now = await call('GET')
   const current = find(now.body?.state)
@@ -96,7 +105,12 @@ const restore = async () => {
       console.log('  (the frontmatter was put back to the bytes it started with)')
     }
   }
-  void originalDescription
+  if (!startedRegistered) {
+    const forgotten = await call('POST', { action: 'forget', id: skillName })
+    if (forgotten.body?.ok === true) {
+      console.log('  (the registry entry this run created was removed)')
+    }
+  }
 }
 
 try {
@@ -153,6 +167,10 @@ try {
 const stillPaused = find((await call('GET')).body?.state)?.paused
 record('the skill was left as it was found', stillPaused === startedPaused,
   `started ${startedPaused ? 'paused' : 'active'}, ended ${stillPaused ? 'paused' : 'active'}`)
+const stillRegistered = find((await call('GET')).body?.state)?.registered === true
+record('and its registry entry was left as it was found',
+  stillRegistered === startedRegistered,
+  `started ${startedRegistered ? 'registered' : 'unregistered'}, ended ${stillRegistered ? 'registered' : 'unregistered'}`)
 
 const failed = results.filter((result) => !result.ok)
 console.log('')
