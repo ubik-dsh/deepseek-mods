@@ -112,6 +112,53 @@ const ENTRIES = [
     ],
     note: 'The message schema names a tool surface this harness does not have, so most of it is a transcript of one product rather than a protocol — and it recommends JSON status messages while its own anti-pattern table forbids them.',
   },
+  // ── 1C:Enterprise. 159 repositories carry a SKILL.md for it, and the same skill
+  //    names recur across a dozen of them, so these are three different authors and
+  //    three different kinds of thing: an invariant, a reference, and a wrapper.
+  {
+    name: 'no-direct-db-access',
+    repo: 'SteelMorgan/1c-agent-based-dev-framework',
+    path: 'framework/rules/no-direct-db-access/SKILL.md',
+    description: 'A global rule forbidding every agent from touching the 1C database directly: no INSERT, UPDATE, DELETE or DDL, no SQL scripts proposed, no bypass of platform mechanisms. Reads through the DBMS are allowed only with the user\'s agreement, and read-only diagnostics only for performance work.',
+    keep: 'no',
+    runsHere: 'after porting',
+    hearing: { prosecutor: 6, defence: 5, verdict: 'reject the skill, take these parts', cases: 9 },
+    taken: [
+      'the rule and its reason — the platform is the only legitimate layer, because going under it bypasses business logic and breaks integrity — since a prohibition with a reason survives paraphrase and a bare one does not',
+      'the reflex of answering with an alternative rather than a refusal: not "no", but "no, here is the platform way"',
+      'the narrow read-only exception for performance diagnostics, bounded to EXPLAIN and system views and stated twice as read-only',
+    ],
+    note: 'Written for a framework with a shared context file and a clarification mechanism of its own, so two of its four response steps cannot be followed elsewhere, and its exception is self-authorising: the agent decides whether a task counts as a performance task. The substance is portable even where the plumbing is not.',
+  },
+  {
+    name: 'composing-1c-queries',
+    repo: 'ROCTUP/1c-mcp-toolkit',
+    path: 'skills/composing-1c-queries/SKILL.md',
+    description: 'How to write correct 1C query-language queries: clause structure, table naming for catalogs, documents, registers and their virtual tables, field selection, compound-type dereferencing, NULL handling, joins, grouping, totals, temporary tables and parameters.',
+    keep: 'no',
+    runsHere: 'after porting',
+    hearing: { prosecutor: 6, defence: 5, verdict: 'reject the skill, take these parts', cases: 9 },
+    taken: [
+      'verify metadata before composing a query, with the cost argument attached — one call to retrieve names is cheaper than debugging a failed query — which is the same shape as stating the facts before the first edit',
+      'the 1C traps that the documentation buries: compound-type field dereferencing, and NULL in virtual tables',
+    ],
+    note: 'The most useful sentence is the first — never invent metadata names — and the remaining 440 lines are platform reference that documents better and goes stale. It also promotes a transport limit to a rule about the language: write every query on a single line, with no reason given.',
+  },
+  {
+    name: 'db-run',
+    repo: 'Nikolay-Shirokov/cc-1c-skills',
+    path: '.claude/skills/db-run/SKILL.md',
+    description: 'Launches a 1C information base in user mode. Resolves which base from an explicit parameter, a name, or the current Git branch, then calls a PowerShell script with the platform path, credentials and any external data processor or navigational link to open.',
+    keep: 'no',
+    runsHere: 'after porting',
+    hearing: { prosecutor: 7, defence: 4, verdict: 'reject the skill, take these parts', cases: 9 },
+    taken: [
+      'the base-selection order, and above all matching the current Git branch against the base list — the branch chooses the database, which is a decision procedure rather than a mechanic',
+      'the two parameters that drive 1C rather than merely open it: run an external data processor, and open a navigational link straight to an object',
+    ],
+    note: 'It is a README for one PowerShell file: every rule lives in the script, and the body only resolves arguments. It also passes a password as a command-line argument, which is readable by other processes, and it returns control before knowing whether 1C started — so the agent cannot tell success from silence.',
+  },
+
 ]
 
 let failed = 0
