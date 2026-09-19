@@ -83,6 +83,34 @@ git remote set-url --add --push origin https://gitverse.ru/<пользовате
 git push origin main
 ```
 
+У этой схемы есть неприятный режим отказа: когда один хостинг пуш отклоняет, а
+другой принимает, `git push` всё равно сообщает об ошибке, но копии остаются на
+разных коммитах. Для этого и есть `tools/dev/push-mirrors.mjs` — он пушит в
+каждое зеркало по очереди и затем сообщает, до каких **не** добрался, чтобы
+недоделанную публикацию нельзя было принять за законченную:
+
+```bash
+node tools/dev/push-mirrors.mjs            # все зеркала
+node tools/dev/push-mirrors.mjs --dry-run  # только отчёт
+```
+
+Токены он читает из файлов — `$GITVERSE_TOKEN_FILE`, `$GITHUB_TOKEN_FILE`, иначе
+`~/.dsh-mirror-tokens/<имя>` — и вычищает их из всего, что печатает.
+
+### Токену нужен доступ `workflow`
+
+Токена GitHub только с `repo` для этого репозитория **недостаточно**. В нём
+лежит `.github/workflows/ci.yaml`, а git отказывается создавать или обновлять
+файл workflow без доступа `workflow`:
+
+```
+! [remote rejected] main -> main (refusing to allow a Personal Access Token to
+  create or update workflow `.github/workflows/ci.yaml` without `workflow` scope)
+```
+
+Пуш отклоняется целиком, поэтому ничего частичного не оседает, — но он будет
+падать, пока у токена нет и `repo`, и `workflow`.
+
 Если в веб-интерфейсе GitVerse есть импорт существующего репозитория с GitHub —
 это на один пуш меньше; поищи в текущем меню пункт «Импорт».
 

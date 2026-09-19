@@ -15,6 +15,7 @@ install or use them.
 | `verify-live.mjs` | End-to-end HTTP checks against a running instance: boot graph, the translations actually served, the prompt route's documented shape | Node, a running `dsh web` |
 | `test-mod-manager.mjs` | 27 checks on the mod manager's host half: patch parsing, the actions, and every refusal | Node only |
 | `test-mod-manager-client.mjs` | 13 checks on the mod manager's browser bundle, with a React stub that honours hook dependencies | Node only |
+| `push-mirrors.mjs` | Pushes to every published mirror and says which ones it could not reach | Node, git, tokens in files |
 | `link-dsh.mjs` | Links the repository to a DSH installation so `@deepseek-ai/*` resolves for the unit tests | A DSH home |
 | `ui-check.mjs` | Renders the real GUI in headless Edge over CDP, opens a session, clicks the prompt control, screenshots | Windows, Edge, a running `dsh web` |
 | `ui-locale.mjs` | Same harness: opens Settings, switches the language, screenshots | Windows, Edge, a running `dsh web` |
@@ -111,6 +112,7 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 | `verify-live.mjs` | Сквозные HTTP-проверки живого инстанса: boot-граф, реально отдаваемые переводы, документированная форма роута промпта | Node, запущенный `dsh web` |
 | `test-mod-manager.mjs` | 27 проверок host-половины менеджера модов: разбор патча, действия и все отказы | Только Node |
 | `test-mod-manager-client.mjs` | 13 проверок браузерного бандла менеджера, на заглушке React, которая уважает зависимости хуков | Только Node |
+| `push-mirrors.mjs` | Пушит во все зеркала и сообщает, до каких не добрался | Node, git, токены в файлах |
 | `link-dsh.mjs` | Привязывает репозиторий к установке DSH, чтобы юнит-тесты видели `@deepseek-ai/*` | Домашний каталог DSH |
 | `ui-check.mjs` | Отрисовка настоящей GUI в headless Edge по CDP: открыть сессию, нажать кнопку промпта, снять скриншоты | Windows, Edge, запущенный `dsh web` |
 | `ui-locale.mjs` | Тот же стенд: открыть настройки, переключить язык, снять скриншоты | Windows, Edge, запущенный `dsh web` |

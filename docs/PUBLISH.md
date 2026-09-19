@@ -81,6 +81,34 @@ git remote set-url --add --push origin https://gitverse.ru/<user>/dsh-mods.git
 git push origin main
 ```
 
+That arrangement has a failure mode worth knowing: when one host rejects the
+push and the other accepts it, `git push` still reports an error while leaving
+the two copies at different commits. `tools/dev/push-mirrors.mjs` exists for
+that — it pushes to each mirror in turn and then says which ones it did **not**
+reach, so a half-finished publish cannot be mistaken for a finished one:
+
+```bash
+node tools/dev/push-mirrors.mjs            # every mirror
+node tools/dev/push-mirrors.mjs --dry-run  # report only
+```
+
+It reads each token from a file — `$GITVERSE_TOKEN_FILE`, `$GITHUB_TOKEN_FILE`,
+else `~/.dsh-mirror-tokens/<name>` — and scrubs them from everything it prints.
+
+### The token needs the `workflow` scope
+
+A GitHub token with only `repo` is **not** enough for this repository. It ships
+`.github/workflows/ci.yaml`, and git refuses to create or update a workflow file
+without the `workflow` scope:
+
+```
+! [remote rejected] main -> main (refusing to allow a Personal Access Token to
+  create or update workflow `.github/workflows/ci.yaml` without `workflow` scope)
+```
+
+The push is rejected whole, so nothing partial lands — but it will keep failing
+until the token carries both `repo` and `workflow`.
+
 If GitVerse offers importing an existing repository from GitHub in its web
 interface, that is one less push — check its current menu for an "Import"
 entry.
