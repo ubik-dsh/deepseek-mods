@@ -63,6 +63,7 @@ window.__ModuleLoader__.load({
 			shadow: "Shadowed by",
 			shadowHint: "Another root wins resolution for this name, so this copy is not the one served.",
 			modelDescription: "Description for the model",
+			modelDescriptionFull: "Full description for the model",
 			modelHint: "This is the text DSH matches a request against, and it is written straight into the skill's frontmatter. Nothing else in the file is touched.",
 			humanSummary: "One line for a person",
 			humanHint: "Kept in the registry beside this panel. No model ever reads it.",
@@ -110,6 +111,7 @@ window.__ModuleLoader__.load({
 			shadow: "Перекрыт",
 			shadowHint: "Другой корень выигрывает разрешение этого имени, поэтому отдаётся не эта копия.",
 			modelDescription: "Описание для модели",
+			modelDescriptionFull: "Полное описание для модели",
 			modelHint: "Именно по этому тексту DSH сопоставляет запрос, и он записывается прямо в шапку скилла. Больше в файле ничего не трогается.",
 			humanSummary: "Кратко для человека",
 			humanHint: "Хранится в реестре рядом с этой панелью. Модель его не читает никогда.",
@@ -233,11 +235,17 @@ window.__ModuleLoader__.load({
 			cardRight: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 },
 			skillName: {
 				fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-				fontSize: "12.5px",
+				fontSize: "14px",
+				opacity: 0.75,
 				wordBreak: "break-all",
 			},
-			description: { fontSize: "12px", opacity: 0.72, marginTop: "3px", lineHeight: 1.45 },
-			human: { fontSize: "12px", opacity: 0.9, marginTop: "3px", fontStyle: "italic" },
+			// The line a person actually reads to find out what a skill does. It was
+			// 12px at 72% opacity — the size of a footnote, and it read like one: the
+			// panel listed twenty skills and none of them said what it was for.
+			// Roughly doubled and brought up to full opacity, because this text is the
+			// reason the tab exists.
+			summary: { fontSize: "24px", lineHeight: 1.3, marginTop: "5px", opacity: 0.95 },
+			human: { fontSize: "13px", opacity: 0.9, marginTop: "3px", fontStyle: "italic" },
 			dot: { display: "inline-flex", alignItems: "center" },
 			chevron: { display: "inline-flex", opacity: 0.55, transition: "transform .15s ease" },
 			details: {
@@ -281,6 +289,23 @@ window.__ModuleLoader__.load({
 			if (bytes < 1024) return `${String(bytes)} B`;
 			if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
 			return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+		}
+
+		/**
+		 * The one line a person reads to know what a skill does.
+		 *
+		 * The human summary when there is one; otherwise the first sentence of the
+		 * model-facing description. That description is written for a model to match a
+		 * request against, so it is often long and dry — "Use when the user wants to
+		 * create, read, edit, or manipulate files in this format…" — and all of it in a
+		 * card makes a wall rather than an answer. The full text is one click away.
+		 */
+		function summaryOf(skill) {
+			const source = skill.humanSummary !== "" ? skill.humanSummary : skill.description;
+			if (source === "") return "";
+			const sentence = source.split(/(?<=[.!?])\s+/u)[0] ?? source;
+			const text = sentence.length >= 48 ? sentence : source;
+			return text.length > 200 ? `${text.slice(0, 197)}…` : text;
 		}
 
 		/** The tab body. */
@@ -385,6 +410,11 @@ window.__ModuleLoader__.load({
 					pair(t("file"), skill.file, "f"),
 					pair(t("size"), sizeOf(skill.bytes), "z"),
 				];
+				// The whole of the model-facing text, because the card's big line is
+				// deliberately only the first sentence of it.
+				if (skill.description !== "" && skill.description !== summaryOf(skill)) {
+					rows.push(pair(t("modelDescriptionFull"), skill.description, "d"));
+				}
 				if (broken) rows.push(pair(t("problem"), skill.problem, "p"));
 				if (skill.shadowedBy) {
 					rows.push(pair(t("shadow"), skill.shadowedBy, "sh"));
@@ -451,10 +481,15 @@ window.__ModuleLoader__.load({
 					},
 						h("div", { style: styles.cardMain },
 							h("div", { style: styles.skillName }, skill.name),
-							skill.humanSummary !== ""
-								? h("div", { style: styles.human }, skill.humanSummary)
+							summaryOf(skill) !== ""
+								? h("div", { style: styles.summary }, summaryOf(skill))
 								: null,
-							skill.description !== "" ? h("div", { style: styles.description }, skill.description) : null),
+							// The human summary is a second line only when it exists AND
+							// differs from what the big line already says.
+							skill.humanSummary !== "" && skill.description !== "" && skill.description !== summaryOf(skill)
+								? h("div", { style: styles.human },
+									`${t("modelDescription")}: ${skill.description.length > 140 ? `${skill.description.slice(0, 137)}…` : skill.description}`)
+								: null),
 						h("div", { style: styles.cardRight },
 							h("span", { style: styles.dot, key: "dot" }, h(primitives.StateDot, { state: dotState })),
 							!broken
