@@ -1,0 +1,31 @@
+{
+  "name": "@local/dsh-skill-scout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH plugin: a Settings panel that is a board for finding skills — anyone writes what to look for, an agent runs the search, the survivors go on trial, and what is decided is filed in a catalogue with the verdict, the rating and the source link",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "README.md",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

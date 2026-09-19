@@ -13,6 +13,10 @@ are an AI agent working here, read this first.
 - `packages/skill-manager/` — a dual-face plugin: a Settings tab that lists the
   skills this Harness resolves, gives each a model-facing description and a
   one-line human summary, and pauses or resumes it by renaming the file DSH reads.
+- `packages/skill-scout/` — a dual-face plugin: a Settings tab that is a **board** for
+  finding skills. Anyone writes what to look for, an agent runs the search and puts
+  the survivors on trial, and what was decided is filed with two axes — worth keeping,
+  and runs here — plus the rating and the source link. Adoption is a person's.
 - `tools/` — installer, verifier, builders, and `tools/lib/session-cookie.mjs`,
   the single place that mints the browser-session cookie. No absolute paths.
 - `tools/dev/` — development and verification harness. **Machine-specific paths
@@ -65,6 +69,8 @@ node tools/dev/test-mod-manager.mjs    # mod manager, host half
 node tools/dev/test-mod-manager-client.mjs  # mod manager, browser bundle
 node tools/dev/test-skill-manager.mjs       # skill manager, host half
 node tools/dev/test-skill-manager-client.mjs  # skill manager, browser bundle
+node tools/dev/test-skill-scout.mjs        # skill scout, host half
+node tools/dev/test-skill-scout-client.mjs # skill scout, browser bundle
 node tools/dev/check-deployed.mjs     # does the deployment match packages/?
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
