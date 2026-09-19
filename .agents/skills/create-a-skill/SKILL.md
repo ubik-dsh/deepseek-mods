@@ -11,17 +11,27 @@ yourself a new capability in one file, and it is live immediately.
 
 ## Where it goes
 
-DSH looks for skills in the project root, meaning the root of the workspace you
-are working in:
+DSH looks for skills in seven roots. Ranks run 100 to 600 and **the lower rank
+wins** when two roots offer the same name; the nearest layer beats a duplicate
+outright, and rank only decides between roots inside one layer.
 
 | Root | Rank | Use it for |
 |---|---|---|
-| `<project>/.agents/skills` | 200 | skills that belong to the project and should travel with it |
-| `<project>/.dsh/skills` | 100 | the same, for skills the project keeps to itself |
+| `<project>/.dsh/skills` | 100 | a project's own skills |
+| `<project>/.agents/skills` | 200 | project skills that should travel with the repository — **prefer this one** |
+| a runtime registration | 250 | skills a plugin registers while running |
+| custom roots, if configured | 300 | an installation's own arrangement |
+| `$DSH_HOME/skills` | 400 | one person's skills, for every project |
+| `$DSH_AGENTS_HOME`, default `~/.agents`, then `/skills` | 500 | shared across the agents on a machine |
+| the bundled directory | 600 | shipped with the harness, and trusted |
 
-Both are watched. Write the file and the skill exists — no restart, no reload.
-Prefer `.agents/skills`: it is the conventional location, and a repository that
-carries it gives every agent that opens it the same capabilities.
+Every one of them is watched. Write the file and the skill exists — no restart,
+no reload, no install.
+
+Prefer `<project>/.agents/skills` for anything meant to travel with a repository:
+clone the repository, open it as the workspace, and the agent already has the
+capability. Reach for `$DSH_HOME/skills` when the skill should follow the person
+rather than the project.
 
 ## The file
 
@@ -111,10 +121,15 @@ attention with the actual task.
 
 ## The contract this file was written against
 
-DSH `0.1.5-rc.2`. The location, the kebab-case rule, the two required fields and
-the live discovery were read out of `@deepseek-ai/dsh-skill` and
-`@deepseek-ai/dsh-skill-filesystem`, and confirmed by dropping a skill into a
+DSH `0.1.5-rc.2`. The locations and their ranks, the kebab-case rule, the two
+required fields and the live discovery were read out of `@deepseek-ai/dsh-skill`
+and `@deepseek-ai/dsh-skill-filesystem`, and confirmed by dropping a skill into a
 live workspace and watching the catalogue change.
+
+The first version of this file listed only the two project roots and missed the
+user-level ones — a third-party skill's documentation had them right and forced
+the correction. Read other people's skills; they are the cheapest way to find out
+what you assumed.
 
 If those packages have moved on, read them again before trusting this file:
 
