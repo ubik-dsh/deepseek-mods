@@ -73,6 +73,7 @@ window.__ModuleLoader__.load({
 			added: "Added",
 			forget: "Forget",
 			noteKeep: "Worth keeping is the verdict of the hearing. Runs here is a separate question — a good skill for a mechanism this Harness does not have is good and unusable, and one score would hide that.",
+			noteStore: "This is a store, not a search. The scout reads it first and only then goes to GitHub, so a skill found once is never hunted for again.",
 			noteQueue: "The tab is a board, not a worker. It writes the task; an agent runs the search, because searching needs a token and the network and neither belongs behind a button in a browser.",
 			noteAdd: "Adding is a person's decision and the only way anything is adopted.",
 			refresh: "Refresh",
@@ -131,6 +132,7 @@ window.__ModuleLoader__.load({
 			added: "Добавлено",
 			forget: "Забыть",
 			noteKeep: "«Стоит держать» — вердикт суда. «Работает здесь» — отдельный вопрос: хороший скилл для механизма, которого в этом Harness нет, хорош и неприменим, и одна оценка это скрыла бы.",
+			noteStore: "Это запасник, а не поиск. Скаут читает его первым и только потом идёт на GitHub, поэтому найденное однажды больше не ищется.",
 			noteQueue: "Вкладка — доска, а не работник. Она пишет задание; поиск выполняет агент, потому что для поиска нужен токен и сеть, и ни то ни другое не должно стоять за кнопкой в браузере.",
 			noteAdd: "Ничего не принимается нажатием и единственный способ что-либо принять.",
 			refresh: "Обновить",
@@ -537,6 +539,7 @@ window.__ModuleLoader__.load({
 			}
 
 			body.push(h("div", { style: styles.notes, key: "notes" },
+				h("div", { key: "n0" }, t("noteStore")),
 				h("div", { key: "n1" }, t("noteQueue")),
 				h("div", { key: "n2" }, t("noteKeep")),
 				h("div", { key: "n3" }, t("noteAdd"))));

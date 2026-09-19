@@ -96,10 +96,20 @@ ok('the source link is built when none is given',
   recorded.entry?.url === 'https://github.com/affaan-m/ECC')
 ok('nothing is adopted by recording it', recorded.entry?.adopted === false)
 ok('it needs a name and a repository', MOD.record({ name: 'x' }).code === 'needs-name-and-repo')
+// Nothing enters the store without a verdict. The scout reads this list before it
+// searches, so an unjudged row would be trusted as though it had been judged.
+ok('a skill with no verdict cannot enter the store',
+  MOD.record({ name: 'unjudged', repo: 'someone/repo', keep: 'yes' }).code === 'needs-verdict')
+ok('and one with no worth-keeping axis is refused too',
+  MOD.record({ name: 'unjudged', repo: 'someone/repo', hearing: { verdict: 'acquit' } }).code
+    === 'needs-verdict')
+ok('a judged skill is stamped with when it entered the store',
+  typeof recorded.entry?.addedAt === 'string', String(recorded.entry?.addedAt))
 
 // re-recording is an update, not a duplicate
 const rechecked = MOD.record({
   name: 'gateguard', repo: 'affaan-m/ECC', keep: 'with a boundary', runsHere: 'after porting',
+  hearing: { prosecutor: 6, defence: 5, verdict: 'reject the skill, take these parts', cases: 3 },
 })
 ok('a re-check replaces the entry rather than duplicating it',
   MOD.readCatalogue().entries.length === 1 && rechecked.replaced === true)
@@ -116,7 +126,10 @@ ok('an unknown entry cannot be adopted', MOD.adopt('nope', true).code === 'no-su
 ok('adoption survives a re-check',
   (() => {
     MOD.adopt(rechecked.entry.id, true)
-    MOD.record({ name: 'gateguard', repo: 'affaan-m/ECC', keep: 'yes', runsHere: 'yes' })
+    MOD.record({
+      name: 'gateguard', repo: 'affaan-m/ECC', keep: 'yes', runsHere: 'yes',
+      hearing: { prosecutor: 2, defence: 8, verdict: 'acquit', cases: 4 },
+    })
     return MOD.readCatalogue().entries[0].adopted === true
   })(),
   'a re-check must not silently un-adopt what a person chose')
@@ -126,9 +139,12 @@ ok('forgetting it again is refused', MOD.forget(rechecked.entry.id).code === 'no
 
 // ── the snapshot the panel reads ──────────────────────────────────────────────
 
-MOD.record({ name: 'keepme', repo: 'someone/repo', keep: 'yes', runsHere: 'yes' })
-MOD.record({ name: 'portme', repo: 'someone/repo', keep: 'with a boundary', runsHere: 'after porting' })
-MOD.record({ name: 'dropme', repo: 'someone/repo', keep: 'no', runsHere: 'no' })
+MOD.record({ name: 'keepme', repo: 'someone/repo', keep: 'yes', runsHere: 'yes',
+  hearing: { verdict: 'acquit' } })
+MOD.record({ name: 'portme', repo: 'someone/repo', keep: 'with a boundary', runsHere: 'after porting',
+  hearing: { verdict: 'fix' } })
+MOD.record({ name: 'dropme', repo: 'someone/repo', keep: 'no', runsHere: 'no',
+  hearing: { verdict: 'reject entirely' } })
 MOD.adopt('someone-keepme', true)
 
 const snapshot = MOD.snapshot()

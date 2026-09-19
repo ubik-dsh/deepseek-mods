@@ -1,8 +1,16 @@
 # Skill scout
 
-A DSH plugin adding a **Skill scout** tab to *Settings → Plugins*, one step after
-**Skills**. It is a board for finding and judging skills, and it is the piece that
-makes the search accumulate instead of starting over.
+A DSH plugin adding a **Found skills** tab to *Settings → Plugins*, one step after
+**Skills**. It is the **store** of skills already found and judged, and it is what makes
+the search accumulate: the scout reads it *before* it searches, so a skill found once is
+never hunted for again.
+
+Nothing enters the store without a verdict. A row with no judgement on it would be
+trusted as though it had one, and the whole reason for keeping a store is that the scout
+can skip a search on the strength of what is in it.
+
+Every entry carries the date it entered, because a store with no dates is a pile of
+things someone once thought were interesting.
 
 ## The pipeline
 

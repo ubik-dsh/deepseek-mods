@@ -201,6 +201,15 @@ export function record(payload) {
   const repo = String(payload?.repo ?? '').trim()
   if (name_ === '' || repo === '') return { code: 'needs-name-and-repo' }
 
+  // Nothing enters the store without a verdict. The list is what the scout reads
+  // before it searches, so a row with no judgement on it would be trusted as though
+  // it had one — and the whole reason for keeping a store is that the scout can skip
+  // the search on the strength of what is in it.
+  const verdict = String(payload?.hearing?.verdict ?? '').trim()
+  if (verdict === '') return { code: 'needs-verdict' }
+  const keep = String(payload?.keep ?? '').trim()
+  if (keep === '' || keep === 'unknown') return { code: 'needs-verdict' }
+
   const catalogue = readCatalogue()
   const id = payload?.id ?? entryId(repo, name_)
   const entry = {
@@ -214,12 +223,14 @@ export function record(payload) {
     foundBy: payload?.foundBy ?? null,
     foundAt: payload?.foundAt ?? new Date().toISOString(),
     checkedAt: new Date().toISOString(),
-    keep: String(payload?.keep ?? 'unknown'),
+    /** When it entered the store. A store with no dates is a pile. */
+    addedAt: new Date().toISOString(),
+    keep,
     runsHere: String(payload?.runsHere ?? 'unknown'),
     hearing: {
       prosecutor: payload?.hearing?.prosecutor ?? null,
       defence: payload?.hearing?.defence ?? null,
-      verdict: String(payload?.hearing?.verdict ?? ''),
+      verdict,
       cases: Number.isInteger(payload?.hearing?.cases) ? payload.hearing.cases : null,
     },
     taken: Array.isArray(payload?.taken) ? payload.taken.slice(0, 20).map(String) : [],
@@ -236,6 +247,8 @@ export function record(payload) {
     entry.foundAt = catalogue.entries[existing].foundAt ?? entry.foundAt
     entry.adopted = catalogue.entries[existing].adopted === true || entry.adopted
     entry.adoptedAt = catalogue.entries[existing].adoptedAt ?? entry.adoptedAt
+    entry.foundAt = catalogue.entries[existing].foundAt ?? entry.foundAt
+    entry.addedAt = catalogue.entries[existing].addedAt ?? entry.addedAt
     entry.discussedAt = catalogue.entries[existing].discussedAt ?? entry.discussedAt
     entry.discussions = catalogue.entries[existing].discussions ?? 0
     catalogue.entries[existing] = entry
