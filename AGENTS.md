@@ -52,6 +52,17 @@ are an AI agent working here, read this first.
    the code keeps working and the panel looks the same.
 6. **Keep both languages in sync.** Every user-facing document exists as
    `X.md` (English) and `X.ru.md` (Russian).
+7. **The skills repository is the source; the installed trees are deployment.**
+   This family's skills live in three places at once —
+   `../deepseek-harness-skills/skills` (the source: versioned, published, the one to
+   edit), `../.agents/skills` (the live root this Harness resolves) and
+   `./.agents/skills` (a committed copy, so this repository carries its own tools).
+   Edit the source, then run `node tools/dev/check-skills-synced.mjs --sync` and
+   commit the copies. The first run of that check found `manage-windows` **installed
+   without its `--pid` identity check** — a fix committed to the source and never
+   copied out, so the installed preflight still matched a window by title alone. The
+   code ran, the panel looked the same, and the fifth check of a five-check tool was
+   missing on the machine that needed it.
 
 ## Cheat sheet
 
@@ -74,6 +85,9 @@ node tools/dev/test-skill-manager-client.mjs  # skill manager, browser bundle
 node tools/dev/test-skill-scout.mjs        # skill scout, host half
 node tools/dev/test-skill-scout-client.mjs # skill scout, browser bundle
 node tools/dev/check-deployed.mjs     # does the deployment match packages/?
+node tools/dev/check-skills-synced.mjs # do the installed skill trees match the
+                                       # published source? --sync to copy, --help
+                                       # for the paused-skill rule
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 node tools/dev/verify-store-live.mjs      # the store of finds, live: task,
@@ -100,6 +114,10 @@ node tools/dev/push-mirrors.mjs        # push to every published mirror
 
 Кратко по-русски: это репозиторий модов для DSH. Не правь установку DSH, не
 перезапускай `dsh web` без разрешения, не коммить секреты, проверяй результат
-командой `tools/boot-check.mjs`, держи документацию на двух языках.
+командой `tools/boot-check.mjs`, держи документацию на двух языках. Скиллы
+правятся в `../deepseek-harness-skills/skills`, оттуда копируются в
+`../.agents/skills` и `./.agents/skills` командой
+`node tools/dev/check-skills-synced.mjs --sync` — без неё правка живёт только
+в репозитории, а работает старая.
 Инструкция по установке — `docs/AI-INSTALL.ru.md`, по созданию мода —
 `docs/AI-PROMPT.ru.md`.
