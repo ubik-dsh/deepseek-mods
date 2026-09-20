@@ -34,8 +34,70 @@ the click and the deletion that this family has seen. **Measure the menu before 
 this skill's neighbour `manage-windows` insists, a click that lands on the wrong row is an action
 on someone else's work.
 
-## What the editor does that the API does not
+## Deleting a post, and the same menu
 
+`Удалить` is the last item of that menu, two rows below `Редактировать`. **A deletion offers an
+undo** — VK shows `Пост удалён. Восстановить` where the post was, and it is the only reversible
+destructive action in this interface. It does not last; treat it as a grace period, not a safety
+net.
+
+**The menu flips.** With a post near the bottom of the window it opens **upward**, and `Удалить`
+then sits *above* the `…` button rather than about 250 px below it. A coordinate measured from a
+menu that opened downward deletes nothing there and lands on the post instead. **Measure the menu
+every time; never carry a coordinate from one opening to the next** — this is the same rule
+`manage-windows` states and the same one that a mis-click here proved.
+
+## Three things the interface does that cost a step each
+
+- **The `…` button is about 20 px wide.** Clicking from a full-screen capture lands on the post
+  body, which opens the post in a modal instead — `Escape` closes it and nothing is lost, but the
+  step is. **Crop and magnify the button before clicking it**, which is how its centre was
+  measured here after one miss.
+- **Page Down does not scroll this page.** It scrolls its own container, not the document, so the
+  key does nothing. **The mouse wheel works**, but not while the pointer is over a photo, which
+  swallows it — park the cursor over the post text.
+- **A confirmation screen sits between the editor and the save.** The first screen is the content,
+  `Далее` moves to the second, and the second is where attachments are listed and `Сохранить`
+  lives. **An attachment is removed on the second screen**, by the ✕ beside its name — not in the
+  editor, where it does not appear at all.
+
+## Editing the text: replace the whole field, never position a caret
+
+**The clipboard is the way in and the way out.** Click once in the text field, then:
+
+```
+Ctrl+A          select all of it
+Ctrl+C          copy        -> Get-Clipboard  gives the agent the text as a value
+edit the value  in a variable, with the tools the agent already has
+Set-Clipboard   write it back
+Ctrl+A, Ctrl+V  paste it over the whole field
+```
+
+The first attempt at adding a line of text did it the obvious way — click where the line should go,
+press Ctrl+Home, type. It **split a word in the middle**, because a click lands where the pixels
+say and not where the sentence does. Recovering cost two undos and a second attempt.
+
+**Replacing the field does three things that positioning a caret cannot.** It makes the edit
+idempotent, so running it twice is the same as running it once. It repairs damage already done,
+because the old content is not edited — it is discarded. And it removes the need to know where the
+insertion point is, which is the part no screenshot can tell you.
+
+**It also turns the interface into something the agent can READ.** `Get-Clipboard` returned the
+post's text as a string, which no API call with this token can do — `wall.get` is refused. Copying
+a field out and editing it in a variable is the general form of that trick, and it applies to any
+interface that will let you select text.
+
+**The clipboard is the operator's.** Reading and writing it is covered by G7 in `route-a-task` for
+the same reason a screenshot is: it is a view of what the operator was doing. Take it when the
+operator asked for the work; put back what you took if the work did not need to change it.
+
+## What this editor does to a pasted text
+
+A blank line between the new first line and the body **does not survive the save** — VK renders the
+two lines adjacent. Nothing is lost but a paragraph break, and the text reads correctly either way;
+it is recorded so that the next reader does not go looking for a bug in their paste.
+
+## What the editor does that the API does not
 - **it takes a photo.** The dashed area accepts a file, the file uploads, a thumbnail appears, and
   `Сохранить` puts a **full-width image** on the post. This is the one thing no API route with a
   community token can do: `photos.getWallUploadServer` and `photos.saveWallPhoto` are both refused,
