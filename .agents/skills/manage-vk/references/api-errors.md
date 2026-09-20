@@ -31,18 +31,88 @@ was meant.
 
 | code | meaning | measured? | what to do |
 |---|---|---|---|
-| 15 | `Access denied: token required` | **measured** | the token is absent or empty — set `VK_COMMUNITY_TOKEN` |
+| 15 | `Access denied: token required` | **measured** | **no token was sent at all.** Set it and try again |
+| 5 | `User authorization failed: invalid access_token (4)` | **measured** | **a token was sent and VK refused it.** Check it is the **community** key and that the API section is enabled for the group. *Some sources attribute this to IP binding on tokens from the implicit flow; that was not verified here and is not relied on* |
 | 6 | too many requests per second | received | retryable. Wait longer and send fewer. Never retry in a tight loop |
 | 9 | too many requests per day | received | not retryable today. The quota is gone until it resets |
-| 5 | `User authorization failed` | received | the token was refused. Check it is the **community** key and that the API section is enabled for the group. *Some sources attribute this to IP binding on tokens obtained through the implicit flow; that was not verified here and is not relied on* |
 | 14 | captcha required | received | interactive. A community token normally avoids it; a user token hammering the API does not |
 | 27 | `group authorization failed` | received | usually a missing scope, or the group key was revoked or regenerated |
 | 100 | one of the parameters is wrong | received | read `error_msg` — it names the parameter. Usually `owner_id` with the wrong sign |
 | 214 | the wall is not writable | received | the wall is disabled, or this token may not post to it |
 
+**15 and 5 are different faults and this is worth having measured.** Both were produced here
+on the same day, against the live API, and the difference is not in the message but in the
+cause:
+
+```
+no token sent          -> error_code 15  "Access denied: token required"
+a token sent, invalid  -> error_code  5  "User authorization failed: invalid access_token (4)"
+```
+
+Reading a 5 as "I need a token" sends the reader to look for a token that is already there.
+Reading a 15 as "the token is wrong" sends them to regenerate a key that was never the
+problem. **The first question after either is which of the two it is.**
+
 **Codes that are worth retrying: 6, and a transport failure.** Everything else is either a
 fact about the token or a fact about the request, and asking again produces the same answer
 more slowly.
+
+## The method set of a community token, measured
+
+**This is the most useful table in the skill, and nothing documents it.** A community key
+carries a `wall` permission in its mask and still cannot call six of the eight `wall.*`
+methods. The mask says what the key is *for*; it does not say what VK will *accept*.
+
+Measured against the live API with a full community key — mask 134623237, permissions
+`photos`, `docs`, `messages`, `wall`, `manage`, `stories`, `market`:
+
+| method | result |
+|---|---|
+| `groups.getById` | ok |
+| `groups.getTokenPermissions` | ok |
+| `groups.getMembers` | ok |
+| `groups.edit` | **ok** — proved by changing the community's own visibility and reading it back |
+| `messages.getConversations` | ok |
+| `users.get` | ok (an empty list, having no user context) |
+| **`wall.post`** | **ok** — returned `post_id=1` |
+| `wall.closeComments` | ok |
+| `wall.get` | **error 27** |
+| `wall.getById` | **error 27** |
+| `wall.getComments` | **error 27** |
+| `wall.delete` | **error 27** |
+| `wall.edit` | **error 27** |
+| `wall.restore` | **error 27** |
+| `photos.getWallUploadServer` | **error 27** |
+| `stats.get` | **error 27** |
+| `board.getTopics` | **error 27** |
+| `market.get` | **error 27** |
+| `account.getAppPermissions` | **error 27** |
+
+Every failure is the same sentence: `Group authorization failed: method is unavailable with
+group auth.`
+
+### What follows from that, and it is not small
+
+**A community token can write and cannot read.** There is no way to list a wall, read a post
+back, or confirm through the API that a post exists. Confirmation is the returned `post_id` and
+a human looking at the community.
+
+**A community token can write and cannot undo.** `wall.post` is accepted; `wall.delete`,
+`wall.edit` and `wall.restore` are all refused. **A post published with a community key can
+only be removed by hand in the interface.** Worth knowing before the first post, not after.
+
+**Photos cannot be uploaded.** `photos.getWallUploadServer` is refused, so the four-step photo
+sequence cannot begin. Photo posts need a different credential.
+
+**Reading the wall needs a different key.** A **service token** (сервисный ключ доступа), tied
+to an application rather than to a person, reads public data without acting as anyone — a
+better answer than a user token for anything that is only a read, and it cannot post. A full
+workflow may therefore need two credentials with different scopes, and that is a design
+decision rather than a workaround.
+
+**Callback API is not one of these.** It is not an access token at all: it is a secret for
+*receiving* events — VK calls you when something happens in the community. It grants no right
+to call a method and does not change error 27 for a single one of them.
 
 ## Two mistakes that look like permission problems
 
