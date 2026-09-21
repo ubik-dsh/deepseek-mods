@@ -1,6 +1,6 @@
 # @local/dsh-locale-ru
 
-**Russian localization** for the DSH Web GUI. DSH ships English and Chinese
+**Russian localization** for the harness Web GUI. The harness ships English and Chinese
 only; this plugin adds a third language through the locale registry's public
 language-pack API.
 
@@ -37,7 +37,7 @@ keeps showing English: the pack degrades per key rather than breaking the UI.
 reload, and the choice is persisted in `$DSH_HOME/settings.yaml`.
 
 A browser asking for Russian (`Accept-Language: ru`) gets the Russian UI right
-away — DSH derives the locale from the browser until an explicit preference is
+away — the harness derives the locale from the browser until an explicit preference is
 stored.
 
 ## Editing translations
@@ -45,7 +45,7 @@ stored.
 `lib/client.js` is **generated**. Edit the sources and rebuild:
 
 ```
-i18n/en/<namespace>.json    the English source, extracted from a DSH install
+i18n/en/<namespace>.json    the English source, extracted from a harness install
 i18n/ru/<namespace>.json    the Russian translation
 ```
 
@@ -57,7 +57,7 @@ The builder refuses to write the bundle if a translation has a different key
 set or different placeholders than its English source, so a typo cannot ship
 silently. It also refuses empty values.
 
-## Refreshing for a new DSH version
+## Refreshing for a new harness version
 
 ```bash
 node tools/extract-locale.mjs     # re-read the shipped dictionaries
@@ -69,11 +69,11 @@ New namespaces and new keys appear in English until they are translated in
 
 ## Limitations
 
-- DSH provides no plural rules to language packs, so forms were chosen for the
+- The harness provides no plural rules to language packs, so forms were chosen for the
   `.one`/`.other` categories the interface selects between.
 - Copy that plugins read once at registration time (slash-command descriptions
   and the like) keeps the language it was registered under until the page is
-  reloaded — a DSH constraint, not this pack's.
+  reloaded — a harness constraint, not this pack's.
 - The `directory-browser` namespace (13 strings) was translated by hand: its
   dictionary is registered in a loop, which the automated extractor cannot
   follow.

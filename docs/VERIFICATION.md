@@ -5,14 +5,14 @@
 What was actually run against these mods, and what it produced. Reproduce any
 line with the command in the last column.
 
-Environment: DSH `0.1.5-rc.2`, `web` profile, Windows 11, Node `v24.20.0`,
+Environment: the harness `0.1.5-rc.2`, `web` profile, Windows 11, Node `v24.20.0`,
 headless Edge driven over the DevTools Protocol for the UI checks.
 
 ## Results
 
 | # | Check | Command | Result |
 |---|---|---|---|
-| 1 | DSH packages resolvable for the tests | `node tools/dev/link-dsh.mjs` | linked |
+| 1 | Harness packages resolvable for the tests | `node tools/dev/link-dsh.mjs` | linked |
 | 2 | Prompt mod, host half (11 checks) | `node tools/dev/test-host.mjs` | **PASS** |
 | 3 | Prompt mod, browser bundle (6 checks) | `node tools/dev/test-client.mjs` | **PASS** |
 | 4 | Language pack contract and key coverage | `node tools/dev/test-locale-ru.mjs` | **PASS** — 42 namespaces, 1257 keys, 1195 with Cyrillic |
@@ -22,7 +22,7 @@ headless Edge driven over the DevTools Protocol for the UI checks.
 | 8 | Both mods in the served boot graph (live GUI) | `node tools/boot-check.mjs` | **OK** ×2 of 168 client rows |
 | 9 | Prompt mod rendered in a real browser, live GUI | `node _dsh_mod/ui-check.mjs …` | control present; dialog **760 px**; "Load current" filled the editor with **7041 characters**; 0 console errors |
 | 10 | Language pack switched in a real browser | `node _dsh_mod/ui-locale.mjs` | pack in roster; **Русский** offered; → English (`lang=en`) → back to Русский (`lang=ru`); 620 Cyrillic characters; 0 console errors |
-| 11 | Install into a **clean** Harness home, then boot | `node tools/install.mjs` + `dsh web` | both mods in the served boot graph |
+| 11 | Install into a **clean** harness home, then boot | `node tools/install.mjs` + `dsh web` | both mods in the served boot graph |
 | 12 | The same checks on a clean instance **without** the mods | `node tools/dev/verify-live.mjs http://127.0.0.1:3089` | **FAIL** ×4 — packages absent from the boot graph, route `404`. This is the row that shows checks 7 and 18 can fail |
 | 13 | Uninstall on a running instance | `node tools/install.mjs --uninstall` | packages and rows removed; patch restored to `[]`; both rows became **MISS** in the served boot graph **without a restart** |
 | 14 | Re-running the installer writes nothing | `node tools/install.mjs` twice | second run: every package reported current (`is already up to date` in English, `уже актуален` under `--lang ru`), no `mod-backups` directory created |
@@ -49,7 +49,7 @@ the only row whose command lives outside the repository — it verifies the
 *published* copy rather than a checkout, which is a different question from the
 rest of the table.
 
-## What the run established about DSH itself
+## What the run established about the harness itself
 
 Four behaviours, each verified against a running server rather than inferred:
 
@@ -89,7 +89,7 @@ nothing but the repository path and the words "install these mods", with no
 memory of how the mods were built and no access to the author's machine.
 
 Each round used a scratch `DSH_HOME` and its own server on a free port; the
-reviewers never touched the real Harness home.
+reviewers never touched the real harness home.
 
 | Round | Verdict | Score |
 |---|---|---|
@@ -101,14 +101,14 @@ reviewers never touched the real Harness home.
 
 | Finding | Resolution |
 |---|---|
-| The runbook told the reader to ask the user to start `dsh web` first, which is impossible when the user is not present | Removed. Installation was re-verified against an empty Harness home, and a first boot was shown to preserve the patch |
-| A never-booted Harness home has no browser-session secret, and boot fails with `cannot read the browser-session secret` | Added as a troubleshooting row |
+| The runbook told the reader to ask the user to start `dsh web` first, which is impossible when the user is not present | Removed. Installation was re-verified against an empty harness home, and a first boot was shown to preserve the patch |
+| A never-booted harness home has no browser-session secret, and boot fails with `cannot read the browser-session secret` | Added as a troubleshooting row |
 | Commands were written for bash in a world where the reader is on Windows | Every example split into PowerShell and POSIX forms |
 | The `dsh` shim (`.ps1`) is blocked by the Windows execution policy | Added as a troubleshooting row **and** made the direct `node lib/bin.js` call the primary fix, with an explicit instruction never to change the execution policy |
 | `boot-check.mjs` was presented as proof of a working mod, though it only proves the roster | Added "what it does not prove" and the route and GUI checks to the runbook |
 | The launch recipe used undocumented flags (`--no-open`, the port argument) | A copy-pasteable, fully documented launch recipe in Step 4 |
 | A character count was quoted as if it were a property of the mod | Removed; it is environment-dependent |
-| Step 3 assumed the Harness home had been booted at least once | Added a note for the never-booted case |
+| Step 3 assumed the harness home had been booted at least once | Added a note for the never-booted case |
 | `git` was required but absent from Requirements | Added |
 | Development UI scripts wrote screenshots into the repository and used inconsistent ports | Screenshots moved to a temp directory (override with `DSH_SHOTS`), port made a parameter, all documented in `tools/dev/README.md` |
 | Re-running the installer still accumulated backup snapshots, and a code comment claimed otherwise | `treeDigest()` / `sameTree()` compare content digests, so a second run prints `already up to date` and writes nothing — verified as a full install/install/uninstall round trip |
@@ -136,9 +136,9 @@ Stated plainly, so nobody reads more into the table than it says:
   and the tools take no absolute paths, but nothing was run on Linux or macOS.
   The harness under `tools/dev` — the headless-browser and PowerShell scripts —
   *is* Windows-specific and marked as such.
-- **DSH version drift.** Everything above was measured on `0.1.5-rc.2`. The API
+- **Harness version drift.** Everything above was measured on `0.1.5-rc.2`. The API
   surface these mods bind to is listed under
-  [Compatibility](../README.md#compatibility); a newer DSH may rename a slot or
+  [Compatibility](../README.md#compatibility); a newer harness may rename a slot or
   a service, and the mods are designed to fail softly when it does.
 - **Translation quality is reviewed by eye, not by tooling.** The builder
   guarantees key sets and placeholders match the English source; it cannot judge

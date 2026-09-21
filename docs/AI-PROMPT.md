@@ -1,4 +1,4 @@
-# AI prompt — build a DSH mod
+# AI prompt — build a mod for the harness
 
 **English** · [Русский](AI-PROMPT.ru.md)
 
@@ -11,14 +11,14 @@ here automatically.
 
 ## Mission
 
-You are adding a plugin ("mod") to **DeepSeek Harness (DSH)**, an agent harness
+You are adding a plugin ("mod") to **an agent harness**,
 whose browser UI is served by `dsh web`. Work in the user's own installation:
 research it, build a package, install it, and **prove it works**.
 
 Two rules override everything else:
 
-- **Never edit the DSH installation.** Mods are separate packages installed into
-  the Harness home.
+- **Never edit the harness installation.** Mods are separate packages installed into
+  the harness home.
 - **Verify with evidence.** Never report success from code inspection alone. Run
   the check, read the output.
 
@@ -320,7 +320,7 @@ discovers packages under `packages/` automatically.
 
 Then verify, in this order:
 
-1. **Unit-test the halves** without DSH: evaluate the browser bundle with a stub
+1. **Unit-test the halves** without the harness: evaluate the browser bundle with a stub
    `window.__ModuleLoader__`, stub `require`, a minimal React and stub
    primitives; assert the row id, the exports, the slot registration and the
    component tree. Call the host half with a fake `ctx` and exercise every
@@ -347,7 +347,7 @@ Then verify, in this order:
    *changed* row is **not** re-imported, and pointing an existing row at a
    nonexistent specifier left the old route serving `200`. Do not plan a
    hot-swap of an existing entry; restart instead.
-3. **`renderPrompt` throws on an unresolved `{{variable}}`**, and DSH has no
+3. **`renderPrompt` throws on an unresolved `{{variable}}`**, and the harness has no
    escape syntax. If a user can type prompt text, validate it — otherwise you
    break every later request. In your own preview, degrade to tolerant
    interpolation instead of failing.
@@ -361,14 +361,14 @@ Then verify, in this order:
    event allowlist is fixed at build time. Have the browser pull state when it
    needs it.
 8. **`ctx.fs` is the sandbox backend** and denies writes outside the session
-   workspace. For a file under the Harness home use plain `node:fs` (a host
+   workspace. For a file under the harness home use plain `node:fs` (a host
    plugin runs in Node) or `@deepseek-ai/dsh-atomic-write`.
 9. **Never restart the user's server unasked**, and never kill the process you
    are running inside. Hand over the command.
 10. **Do not commit credentials.** `$DSH_HOME/.credentials.yaml` holds API keys
-    and the session signing secret; a DSH-home backup may hold personal
+    and the session signing secret; a backup of the harness home may hold personal
     settings.
-11. **Version drift is real.** DSH is pre-1.0 and its plugin APIs move. Pin what
+11. **Version drift is real.** The harness is pre-1.0 and its plugin APIs move. Pin what
     you tested against, and make failure graceful — a missing slot should cost
     the user a feature, not the GUI.
 12. **PowerShell 5.1 mangles UTF-8** when a script uses `Get-Content -Raw` +
@@ -383,8 +383,8 @@ Then verify, in this order:
 - [ ] Bilingual README for the package (English `README.md`, Russian `README.ru.md`).
 - [ ] Installable with the repository installer; no absolute paths in it.
 - [ ] Unit tests for both halves, passing.
-- [ ] Installed into a **clean** Harness home and confirmed in the served boot graph.
+- [ ] Installed into a **clean** harness home and confirmed in the served boot graph.
 - [ ] Written record of what was verified and what was not.
 
-Report honestly: what works, what is unverified, and what depends on the DSH
+Report honestly: what works, what is unverified, and what depends on the harness
 version.

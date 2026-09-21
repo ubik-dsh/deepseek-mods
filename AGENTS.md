@@ -1,6 +1,6 @@
 # Agent instructions
 
-This repository contains **mods (plugins) for DeepSeek Harness (DSH)**. If you
+This repository contains **mods (plugins) for an agent harness**. If you
 are an AI agent working here, read this first.
 
 ## What you are working with
@@ -11,8 +11,9 @@ are an AI agent working here, read this first.
 - `packages/mod-manager/` — a dual-face plugin: a Settings tab that lists
   installed mods and turns them off, on, or removes them.
 - `packages/skill-manager/` — a dual-face plugin: a Settings tab that lists the
-  skills this Harness resolves, gives each a model-facing description and a
-  one-line human summary, and pauses or resumes it by renaming the file DSH reads.
+  skills this harness resolves, gives each a model-facing description and a
+  one-line human summary, and pauses or resumes it by renaming the file the
+  harness reads.
 - `packages/skill-scout/` — a dual-face plugin: a Settings tab that is the **collection of
   finds** — skills already found and judged, each with its source, description, two
   axes (worth keeping, runs here), the hearing's rating and the date it entered. The
@@ -34,8 +35,8 @@ are an AI agent working here, read this first.
 
 ## Rules that override convenience
 
-1. **Never edit the DSH installation.** Mods are separate packages installed into
-   the Harness home (`$DSH_HOME`, default `~/.dsh`).
+1. **Never edit the harness installation.** Mods are separate packages installed
+   into the harness home (`$DSH_HOME`, default `~/.dsh`).
 2. **Never restart the user's `dsh web` process unasked**, and never kill the
    process you are running inside. A changed package file needs a restart to
    take effect — hand the user the command.
@@ -55,7 +56,7 @@ are an AI agent working here, read this first.
 7. **The skills repository is the source; the installed trees are deployment.**
    This family's skills live in three places at once —
    `../deepseek-harness-skills/skills` (the source: versioned, published, the one to
-   edit), `../.agents/skills` (the live root this Harness resolves) and
+   edit), `../.agents/skills` (the live root this harness resolves) and
    `./.agents/skills` (a committed copy, so this repository carries its own tools).
    Edit the source, then run `node tools/dev/check-skills-synced.mjs --sync` and
    commit the copies. The first run of that check found `manage-windows` **installed
@@ -72,7 +73,7 @@ node tools/install.mjs --dry-run       # preview
 node tools/install.mjs --uninstall     # remove packages and their rows
 node tools/boot-check.mjs              # is each mod in the served boot graph?
 node tools/build-locale.mjs            # rebuild the language bundle from i18n/
-node tools/extract-locale.mjs          # re-read dictionaries from a DSH install
+node tools/extract-locale.mjs          # re-read dictionaries from a harness install
 node tools/dev/link-dsh.mjs            # make @deepseek-ai/* resolvable for tests
 node tools/dev/test-host.mjs           # prompt mod, host half
 node tools/dev/test-client.mjs         # prompt mod, browser bundle
@@ -112,9 +113,10 @@ node tools/dev/push-mirrors.mjs        # push to every published mirror
 
 ---
 
-Кратко по-русски: это репозиторий модов для DSH. Не правь установку DSH, не
-перезапускай `dsh web` без разрешения, не коммить секреты, проверяй результат
-командой `tools/boot-check.mjs`, держи документацию на двух языках. Скиллы
+Кратко по-русски: это репозиторий модов для харнесса. Не правь установку
+харнесса, не перезапускай `dsh web` без разрешения, не коммить секреты,
+проверяй результат командой `tools/boot-check.mjs`, держи документацию на двух
+языках. Скиллы
 правятся в `../deepseek-harness-skills/skills`, оттуда копируются в
 `../.agents/skills` и `./.agents/skills` командой
 `node tools/dev/check-skills-synced.mjs --sync` — без неё правка живёт только

@@ -50,7 +50,7 @@ git config --global user.email "you@example.com"
 ```bash
 git init -b main
 git add .
-git commit -m "DSH mods: system prompt editor and Russian language pack"
+git commit -m "Harness mods: system prompt editor and Russian language pack"
 git remote add origin https://github.com/<пользователь>/dsh-mods.git
 git push -u origin main
 ```
@@ -118,7 +118,7 @@ node tools/dev/push-mirrors.mjs --dry-run  # только отчёт
 
 Описание репозитория:
 
-> Моды для DSH (DeepSeek Harness): редактируемый системный промпт в шапке чата
+> Моды для харнесса агентов: редактируемый системный промпт в шапке чата
 > и русская локализация. Документация на двух языках, установка одной командой.
 
 Теги: `dsh`, `deepseek-harness`, `plugin`, `mod`, `i18n`, `russian`,
@@ -140,7 +140,7 @@ git push
 |---|---|
 | `$DSH_HOME/mod-backups/` | там твой `settings.yaml` и правка промпта — личное |
 | `$DSH_HOME/.credentials.yaml` | ключи API и секрет подписи браузерной сессии — **утечка** |
-| `node_modules/` | часто это junction в домашний каталог DSH |
+| `node_modules/` | часто это junction в домашний каталог харнесса |
 | `_edge-profile*/`, `*.log` | артефакты стенда проверки |
 | что угодно с «token» в имени | для пуша нужен ключ, поэтому ключ и оказывается рядом с тем, что пушишь, — храни его в каталоге, который не является репозиторием |
 

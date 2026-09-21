@@ -48,7 +48,7 @@ From the repository directory:
 ```bash
 git init -b main
 git add .
-git commit -m "DSH mods: system prompt editor and Russian language pack"
+git commit -m "Harness mods: system prompt editor and Russian language pack"
 git remote add origin https://github.com/<user>/dsh-mods.git
 git push -u origin main
 ```
@@ -117,7 +117,7 @@ entry.
 
 Suggested repository description:
 
-> DSH (DeepSeek Harness) mods: an editable system prompt in the chat header and
+> Mods for an agent harness: an editable system prompt in the chat header and
 > a Russian language pack. Bilingual docs, one-command install.
 
 Suggested topics/tags: `dsh`, `deepseek-harness`, `plugin`, `mod`, `i18n`,
@@ -139,7 +139,7 @@ Already covered by `.gitignore`, but worth knowing:
 |---|---|
 | `$DSH_HOME/mod-backups/` | contains your `settings.yaml` and your prompt override — personal |
 | `$DSH_HOME/.credentials.yaml` | API keys and the browser-session signing secret — **a leak** |
-| `node_modules/` | often a junction into the DSH home |
+| `node_modules/` | often a junction into the harness home |
 | `_edge-profile*/`, `*.log` | artefacts of the verification harness |
 | anything named like a token | pushing needs a credential, so the credential ends up near the thing being pushed — save it in a directory that is not a repository |
 

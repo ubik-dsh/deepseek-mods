@@ -1,7 +1,7 @@
 # Mod manager
 
-A DSH plugin that adds a **Mods** tab to *Settings → Plugins*: what is installed
-in this Harness home, what the running page was actually served, and controls to
+A harness plugin that adds a **Mods** tab to *Settings → Plugins*: what is installed
+in this harness home, what the running page was actually served, and controls to
 turn a mod off, turn it back on, or remove it.
 
 It is how you manage mods without a terminal — and without guessing whether a
@@ -12,7 +12,7 @@ restart is needed.
 Each mod is a card in the format the shipped plugin inventory already uses, built
 from the same components: the platform's `Tag` and `StateDot`. A mod therefore
 reads **green when it is on** and **red when it is off**, the way every other
-plugin in DSH reads — not a private look-alike.
+plugin in the harness reads — not a private look-alike.
 
 Clicking the tag is the control: it turns the mod off or on. The chevron opens
 the card, where the details and the destructive action live, so nothing
@@ -75,7 +75,7 @@ The panel is deliberately narrow:
   here;
 - the manager refuses to turn **itself** off, because removing its own row would
   unmount the panel doing the removing;
-- every path it writes is checked to be inside the Harness home;
+- every path it writes is checked to be inside the harness home;
 - a patch file is copied into the snapshot directory before it is rewritten.
 
 ## Two things it cannot do for you

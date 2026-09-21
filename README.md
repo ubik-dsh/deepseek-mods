@@ -1,6 +1,6 @@
-# DSH Mods
+# Harness Mods
 
-Plugins for **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** (DSH) — the
+Plugins for **[an agent harness](https://github.com/deepseek-ai/deepseek-harness)** — the
 agent harness whose browser UI is the `dsh web` GUI.
 
 > **Repository:** <https://gitverse.ru/ubikon/dsh-mods>
@@ -11,7 +11,7 @@ Three mods live here:
 |---|---|
 | **[system-prompt-mod](packages/system-prompt-mod)** | A **Промпт / Prompt** button in the chat header that opens the live system prompt, lets you edit it, and applies the result on the next model request — no restart. |
 | **[locale-ru](packages/locale-ru)** | **Russian localization** for the whole GUI: 42 namespaces, 1257 strings, selectable in Settings → General → Language. |
-| **[skill-manager](packages/skill-manager)** | A **Skills** tab in Settings → Plugins, after Mods: every skill this Harness resolves, with the description the model is matched against and a one-line summary for a person. Pause a skill and the model stops being offered it on the next request — no restart. |
+| **[skill-manager](packages/skill-manager)** | A **Skills** tab in Settings → Plugins, after Mods: every skill this harness resolves, with the description the model is matched against and a one-line summary for a person. Pause a skill and the model stops being offered it on the next request — no restart. |
 | **[mod-manager](packages/mod-manager)** | A **Mods** tab in Settings → Plugins: what is installed, whether the page was actually served it, and turn-off / turn-on / remove — without a restart. |
 
 *Русская версия этого файла: [README.ru.md](README.ru.md).*
@@ -56,19 +56,20 @@ one, written so that it can be checked rather than believed.
 
 What this repository does **not** claim is that any of it is a new idea. Plugin
 managers exist elsewhere. What is uncommon is the verification discipline — and
-the Russian localization, which a scan of the main DSH catalogues found to be an
-empty niche.
+the Russian localization, which a scan of the main harness catalogues found to
+be an empty niche.
 
 ## Requirements
 
-- **DeepSeek Harness** installed and able to run `dsh web`. Tested against **0.1.5-rc.2**.
-- **Node.js** — the same runtime DSH itself runs on.
+- **An agent harness** installed and able to run `dsh web`. Tested against **0.1.5-rc.2**.
+- **Node.js** — the same runtime the harness itself runs on.
 - **git**, to clone (skip it and download the ZIP instead — the installer does
   not need git).
 - No build step, no compiler, no network access at install time.
 
-The mods are plain JavaScript packages. DSH is pre-1.0 and its plugin API moves
-quickly, so read [Compatibility](#compatibility) before upgrading DSH.
+The mods are plain JavaScript packages. The harness is pre-1.0 and its plugin
+API moves quickly, so read [Compatibility](#compatibility) before upgrading the
+harness.
 
 ## Install
 
@@ -127,7 +128,7 @@ boot rows referencing /client.js: 168
   OK   dsh-locale-ru
 ```
 
-The probe reads the browser-session signing secret from your own Harness home,
+The probe reads the browser-session signing secret from your own harness home,
 mints the same cookie the GUI uses, and reports which client rows the served
 boot graph carries. It never prints the secret.
 
@@ -151,7 +152,7 @@ The override is stored in `$DSH_HOME/system-prompt-mod.json` and applies to ever
 agent. While the mod is disabled — which is the default — the prompt is
 untouched.
 
-A text containing a `{{variable}}` group is **rejected** on save: DSH
+A text containing a `{{variable}}` group is **rejected** on save: the harness
 interpolates those strictly and offers no escape syntax, so such a prompt would
 break every later request. The editor explains this instead of accepting it.
 
@@ -161,8 +162,8 @@ break every later request. The editor explains this instead of accepting it.
 choice is persisted in `$DSH_HOME/settings.yaml`.
 
 A browser that asks for Russian (`Accept-Language: ru`) gets the Russian UI
-immediately, without visiting Settings — DSH takes the locale from the browser
-until an explicit choice is stored.
+immediately, without visiting Settings — the harness takes the locale from the
+browser until an explicit choice is stored.
 
 Anything not translated falls back to English per key, so a partial or outdated
 pack degrades gracefully instead of leaving blanks.
@@ -171,7 +172,7 @@ pack degrades gracefully instead of leaving blanks.
 
 Skills are not mods: no install, no restart, no plugin row. A skill is a folder
 of instructions an agent reads when a task matches it, and several harnesses —
-DSH, Claude Code and others — read the same `SKILL.md` format.
+this one and others — read the same `SKILL.md` format.
 
 | Skill | What it does |
 |---|---|
@@ -179,7 +180,7 @@ DSH, Claude Code and others — read the same `SKILL.md` format.
 
 Copy the folder into your harness's skills root and it is live — see
 [Where it goes](.agents/skills/create-a-skill/references/harness-locations.md)
-for DSH's seven roots and the conventions of other harnesses.
+for the harness's seven roots and the conventions of other harnesses.
 
 Plain text, no binaries, nothing to build. The one Python file is a checker that
 reads the standard library and nothing else, so the skill stays usable in any
@@ -198,7 +199,7 @@ file to its shipped empty form. Reload the page afterwards.
 
 This matters for updates, so it is worth knowing:
 
-- A DSH **profile** is a directory under `$DSH_HOME/profiles/<name>/` holding a
+- A harness **profile** is a directory under `$DSH_HOME/profiles/<name>/` holding a
   `package.json` (the bundle list) and `cordis.patch.yml` (your own patch layer).
 - A profile plugin is an npm-shaped package placed in the profile's
   `node_modules`, plus one row in the patch layer:
@@ -210,8 +211,8 @@ This matters for updates, so it is worth knowing:
   ```
 
 - A package becomes a **browser** plugin by declaring `dsh.client` in its
-  `package.json` and exporting a `./client` bundle in the format the DSH client
-  module system serves:
+  `package.json` and exporting a `./client` bundle in the format the harness's
+  client module system serves:
 
   ```js
   window.__ModuleLoader__.load({
@@ -220,9 +221,9 @@ This matters for updates, so it is worth knowing:
   })
   ```
 
-- `$DSH_HOME` is **not** part of the DSH installation. Updating or reinstalling
-  DSH replaces the installation; it leaves the home — your sessions, settings,
-  profiles and these mods — in place.
+- `$DSH_HOME` is **not** part of the harness installation. Updating or
+  reinstalling the harness replaces the installation; it leaves the home — your
+  sessions, settings, profiles and these mods — in place.
 
 The one operation that can drop the mods is installing profile dependencies
 (`dsh plugin --profile web …`), because that runs pnpm, which removes packages
@@ -242,7 +243,7 @@ tools/
   install.mjs          install / uninstall / backup
   boot-check.mjs       verify the served boot graph
   build-locale.mjs     rebuild the language pack from i18n/
-  extract-locale.mjs   pull the shipped dictionaries out of a DSH installation
+  extract-locale.mjs   pull the shipped dictionaries out of a harness installation
   dev/                 development and verification harness (see tools/dev/README.md)
 docs/
   AI-INSTALL.md        install runbook for an AI agent
@@ -253,7 +254,7 @@ docs/
   screenshots/         images used by this file
 .github/workflows/
   ci.yaml              checks that need only Node — runs on GitHub and GitVerse
-AGENTS.md              what a DSH agent working here should know — loaded automatically
+AGENTS.md              what an agent working here should know — loaded automatically
 ```
 
 Adding a mod is a matter of dropping a directory into `packages/`:
@@ -264,12 +265,12 @@ as the loader row id, and reads the package name from its manifest.
 
 This repository is written to be operated by an agent as well as a person:
 
-- **[`AGENTS.md`](AGENTS.md)** — loaded automatically by DSH when an agent works in this
+- **[`AGENTS.md`](AGENTS.md)** — loaded automatically by the harness when an agent works in this
   directory: the rules, the layout, and the command cheat sheet.
 - **[`docs/AI-INSTALL.md`](docs/AI-INSTALL.md)** — a step-by-step install runbook with a
   check after every step and a troubleshooting table.
 - **[`docs/AI-PROMPT.md`](docs/AI-PROMPT.md)** — a ready-to-paste prompt for having an AI
-  **build a new DSH mod**: the reconnaissance procedure, the extension points, the exact
+  **build a new harness mod**: the reconnaissance procedure, the extension points, the exact
   client bundle format, the verified APIs, the pitfalls, and the deliverable checklist.
 
 Both documents exist in Russian too: `docs/AI-INSTALL.ru.md`, `docs/AI-PROMPT.ru.md`.
@@ -279,21 +280,21 @@ covered — is written down in [`docs/VERIFICATION.md`](docs/VERIFICATION.md).
 
 ## Compatibility
 
-The mods bind to DSH plugin APIs at a specific version:
+The mods bind to the harness's plugin APIs at a specific version:
 
 | Mod | Depends on |
 |---|---|
 | system-prompt-mod | the `conversation.session.header.utilities` slot, `ctx.slots`, `ctx.systemPrompt.section`, `ctx.connection.fetch.register`, `ctx.agents.get`, and the `Modal`/`Button`/`Switch`/`Tag` primitives |
 | locale-ru | `ctx.locale.addLanguage`, `ctx.locale.register(namespace, locale, dict)`, and the shipped namespace key sets |
 
-DSH is pre-1.0 and states in its own onboarding notice that core plugins and
-foundational APIs will keep changing. If a future version renames one of these,
+The harness is pre-1.0 and states in its own onboarding notice that core plugins
+and foundational APIs will keep changing. If a future version renames one of these,
 a mod stops loading — **gracefully**: the language pack falls back to English,
 and the prompt mod simply never registers its route, so the GUI itself keeps
 working. Fixes are usually a line or two; the installer is also the recovery
-path after any DSH upgrade.
+path after any harness upgrade.
 
-Namespaces or keys added by a newer DSH stay English until the pack is rebuilt
+Namespaces or keys added by a newer harness stay English until the pack is rebuilt
 with `tools/build-locale.mjs` after re-extracting with `tools/extract-locale.mjs`.
 
 ## Development
@@ -306,12 +307,12 @@ node tools/dev/test-client.mjs             # 6 checks on the prompt browser bund
 node tools/dev/test-locale-ru.mjs          # language pack contract
 ```
 
-The unit tests need the DSH packages (`@deepseek-ai/*`) resolvable from the
-repository, so they run on a machine that has DSH installed; see
+The unit tests need the harness packages (`@deepseek-ai/*`) resolvable from the
+repository, so they run on a machine that has the harness installed; see
 [`tools/dev/README.md`](tools/dev/README.md).
 
 ## License
 
-[MIT](LICENSE). The Russian dictionaries are translations of the DeepSeek
-Harness user interface, which is MIT-licensed; the original English strings
-remain the property of their authors.
+[MIT](LICENSE). The Russian dictionaries are translations of the harness user
+interface, which is MIT-licensed; the original English strings remain the
+property of their authors.

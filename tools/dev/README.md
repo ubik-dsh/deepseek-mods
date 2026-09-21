@@ -7,7 +7,7 @@ install or use them.
 
 | Script | Purpose | Needs |
 |---|---|---|
-| `test-host.mjs` | 11 checks on the prompt mod's host half, against the real `renderPrompt` | DSH packages resolvable |
+| `test-host.mjs` | 11 checks on the prompt mod's host half, against the real `renderPrompt` | Harness packages resolvable |
 | `test-client.mjs` | 6 checks on the prompt mod's browser bundle, with stub React and primitives | Node only |
 | `test-locale-ru.mjs` | Verifies the language pack's contract and full key coverage | Node only |
 | `test-links.mjs` | Checks every relative link and `#anchor` in the repository's Markdown | Node only |
@@ -16,11 +16,11 @@ install or use them.
 | `test-mod-manager.mjs` | 27 checks on the mod manager's host half: patch parsing, the actions, and every refusal | Node only |
 | `test-mod-manager-client.mjs` | 13 checks on the mod manager's browser bundle, with a React stub that honours hook dependencies | Node only |
 | `push-mirrors.mjs` | Pushes to every published mirror and says which ones it could not reach | Node, git, tokens in files |
-| `link-dsh.mjs` | Links the repository to a DSH installation so `@deepseek-ai/*` resolves for the unit tests | A DSH home |
+| `link-dsh.mjs` | Links the repository to a harness installation so `@deepseek-ai/*` resolves for the unit tests | A harness home |
 | `ui-check.mjs` | Renders the real GUI in headless Edge over CDP, opens a session, clicks the prompt control, screenshots | Windows, Edge, a running `dsh web` |
 | `ui-locale.mjs` | Same harness: opens Settings, switches the language, screenshots | Windows, Edge, a running `dsh web` |
 | `verify-live.ps1` | End-to-end pass over the prompt mod's HTTP API on a running instance | PowerShell, a running `dsh web` |
-| `picker-extract.mjs` | Extracts the one dictionary the main extractor cannot follow (registered in a loop) | A DSH installation |
+| `picker-extract.mjs` | Extracts the one dictionary the main extractor cannot follow (registered in a loop) | A harness installation |
 | `locale-chunk.mjs` | Splits extracted dictionaries into balanced work groups for translation | A `locale-en.json` |
 | `restart-web.mjs` | Restarts the `dsh web` process that owns a port; written for one machine, adapt the paths at the top | Windows |
 
@@ -43,10 +43,10 @@ is still in the object database. It scans unreachable blobs too, since
 `git push --mirror` would send those. Without git it reports `PARTIAL` and exits
 2 rather than claiming a clean result it did not establish.
 
-### The unit tests and DSH packages
+### The unit tests and harness packages
 
 `test-host.mjs` imports `@deepseek-ai/dsh-system-prompt` to exercise the real
-prompt assembly, so it needs the DSH packages reachable from the repository.
+prompt assembly, so it needs the harness packages reachable from the repository.
 One command creates that link (a junction on Windows, a symlink elsewhere):
 
 ```bash
@@ -104,7 +104,7 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 
 | Скрипт | Назначение | Что требуется |
 |---|---|---|
-| `test-host.mjs` | 11 проверок host-половины мода промпта на настоящем `renderPrompt` | Пакеты DSH должны резолвиться |
+| `test-host.mjs` | 11 проверок host-половины мода промпта на настоящем `renderPrompt` | Пакеты харнесса должны резолвиться |
 | `test-client.mjs` | 6 проверок браузерного бандла мода промпта на заглушках React и примитивов | Только Node |
 | `test-locale-ru.mjs` | Проверка контракта языкового пакета и полного покрытия ключей | Только Node |
 | `test-links.mjs` | Проверяет все относительные ссылки и `#якоря` в markdown репозитория | Только Node |
@@ -113,11 +113,11 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 | `test-mod-manager.mjs` | 27 проверок host-половины менеджера модов: разбор патча, действия и все отказы | Только Node |
 | `test-mod-manager-client.mjs` | 13 проверок браузерного бандла менеджера, на заглушке React, которая уважает зависимости хуков | Только Node |
 | `push-mirrors.mjs` | Пушит во все зеркала и сообщает, до каких не добрался | Node, git, токены в файлах |
-| `link-dsh.mjs` | Привязывает репозиторий к установке DSH, чтобы юнит-тесты видели `@deepseek-ai/*` | Домашний каталог DSH |
+| `link-dsh.mjs` | Привязывает репозиторий к установке харнесса, чтобы юнит-тесты видели `@deepseek-ai/*` | Домашний каталог харнесса |
 | `ui-check.mjs` | Отрисовка настоящей GUI в headless Edge по CDP: открыть сессию, нажать кнопку промпта, снять скриншоты | Windows, Edge, запущенный `dsh web` |
 | `ui-locale.mjs` | Тот же стенд: открыть настройки, переключить язык, снять скриншоты | Windows, Edge, запущенный `dsh web` |
 | `verify-live.ps1` | Сквозной прогон HTTP-API мода промпта на живом инстансе | PowerShell, запущенный `dsh web` |
-| `picker-extract.mjs` | Извлекает единственный словарь, который не берёт основной извлекатель (он регистрируется в цикле) | Установленный DSH |
+| `picker-extract.mjs` | Извлекает единственный словарь, который не берёт основной извлекатель (он регистрируется в цикле) | Установленный харнесс |
 | `locale-chunk.mjs` | Нарезает извлечённые словари на сбалансированные группы для перевода | Файл `locale-en.json` |
 | `restart-web.mjs` | Перезапускает процесс `dsh web`, владеющий портом; написан под одну машину — поправь пути в начале файла | Windows |
 
@@ -140,10 +140,10 @@ reuse. The installer and the builders under `tools/` take no absolute paths.
 `git push --mirror` отправил бы и их. Без git он сообщает `PARTIAL` и выходит с
 кодом 2, а не заявляет чистый результат, которого не устанавливал.
 
-### Юнит-тесты и пакеты DSH
+### Юнит-тесты и пакеты харнесса
 
 `test-host.mjs` импортирует `@deepseek-ai/dsh-system-prompt`, чтобы работать с
-настоящей сборкой промпта, поэтому пакеты DSH должны быть видны из
+настоящей сборкой промпта, поэтому пакеты харнесса должны быть видны из
 репозитория. Одна команда создаёт нужную ссылку (junction в Windows, symlink в
 остальных системах):
 

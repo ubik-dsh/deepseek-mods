@@ -1,6 +1,6 @@
 # @local/dsh-system-prompt-mod
 
-A **DSH** plugin that puts a **Prompt** control in the chat header: it shows the
+A **harness** plugin that puts a **Prompt** control in the chat header: it shows the
 system prompt the model is actually receiving, lets you edit it, and applies the
 result on the next model request — no restart.
 
@@ -34,7 +34,7 @@ registered at all and the shipped prompt is untouched.
 ## The `{{variable}}` guard
 
 `renderPrompt` interpolates `{{name}}` strictly and **throws** on an unknown
-name, and DSH offers no escape syntax. Text containing a `{{…}}` group is
+name, and the harness offers no escape syntax. Text containing a `{{…}}` group is
 therefore rejected on save (HTTP 400 with an explanation) — otherwise it would
 break every later request.
 
@@ -90,5 +90,5 @@ Reload the GUI afterwards.
   so it applies to every agent, subagents included.
 - In replace mode the dialog cannot show the original prompt — it cannot be
   assembled without dropping `complete` — so the editor holds your version.
-- No push events: the dialog reads state when it opens, because DSH does not
+- No push events: the dialog reads state when it opens, because the harness does not
   forward `system-prompt/change` to the browser.

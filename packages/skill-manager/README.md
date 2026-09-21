@@ -1,14 +1,14 @@
 # Skill manager
 
-A DSH plugin adding a **Skills** tab to *Settings → Plugins*, one step after
-**Mods**: what this Harness resolves, from which root, with which description — and
+A harness plugin adding a **Skills** tab to *Settings → Plugins*, one step after
+**Mods**: what this harness resolves, from which root, with which description — and
 a switch to pause a skill or bring it back.
 
 ## The cards are the platform's
 
 A card is the same shape as a mod card and is built from the same elements —
 `Tag` and `StateDot`. So a skill reads **green when it is available** and **red
-when it is paused**, the way every other element in DSH reads, rather than like
+when it is paused**, the way every other element in the harness reads, rather than like
 something imitating it.
 
 Each card leads with one line saying what the skill is for — the human summary when
@@ -17,7 +17,7 @@ whole of the model description is one click away in the expanded card.
 
 The two fields in that card carry a paragraph of explanation each rather than a
 caption, because the difference between them is the whole point: one text is what
-DSH matches a request against and is written into the skill file, the other is never
+the harness matches a request against and is written into the skill file, the other is never
 read by a model and exists so that a person can recognise the skill later.
 
 The plate **is** the switch: pressing it pauses or resumes. The chevron opens the
@@ -26,7 +26,7 @@ live.
 
 ## How a pause works
 
-**By renaming the file DSH reads.** Nothing is deleted and nothing is edited:
+**By renaming the file the harness reads.** Nothing is deleted and nothing is edited:
 
 | Before | After |
 |---|---|
@@ -41,7 +41,7 @@ The paused state **is** the filename. There is no second source of truth to fall
 out of step with it.
 
 The provider watches its roots and invalidates the catalogue when a path shaped
-like a skill changes, so the rename lands in the **running session**: DSH hands the
+like a skill changes, so the rename lands in the **running session**: the harness hands the
 model its skill list before every request, and a paused skill is simply not in it.
 No reload, no restart.
 
@@ -63,7 +63,7 @@ listed and still works. The form in the card simply fills it in.
 
 ### Two descriptions, and they are not the same text
 
-DSH matches a request against **the `description` line in the frontmatter**. So the
+The harness matches a request against **the `description` line in the frontmatter**. So the
 model-facing description is written **there** — anywhere else it would be a
 description the model never sees. The edit is surgical: exactly one line changes and
 everything else in the file survives byte for byte, which the unit test asserts.
@@ -85,7 +85,7 @@ Skills are grouped by root and each root shows its rank, because **the lower ran
 wins**: the same name in two roots is served from one of them, and the copy that
 loses is marked **shadowed** with the root that beat it.
 
-Roots DSH resolves:
+Roots the harness resolves:
 
 | Rank | Root |
 |---|---|
@@ -100,11 +100,11 @@ sidebar is built from**. The first version resolved the project from the server'
 working directory instead, which is not the project the page is open on, and the
 panel came up empty in a live session.
 
-## Skills DSH silently does not register
+## Skills the harness silently does not register
 
 Shown separately and **not switchable**, because there is nothing to switch: a skill
 whose `name` is not kebab-case, is longer than 64 characters, or **does not match its
-folder** is not registered, and DSH says nothing about it. The tab names the reason —
+folder** is not registered, and the harness says nothing about it. The tab names the reason —
 otherwise a skill can sit in a root and never be offered, with no message anywhere.
 
 ## A byte-order mark in front of the frontmatter

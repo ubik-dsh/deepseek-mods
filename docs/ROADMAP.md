@@ -24,7 +24,7 @@ dropdown instead of overwriting a single override. Import and export as files,
 and a diff between two saved versions.
 
 *Why it is easy:* it is the existing prompt mod with a list in front of it. The
-store is already a JSON file in the Harness home.
+store is already a JSON file in the harness home.
 *Risk:* low. The prompt mod already proves the section and the route.
 
 ### Project memory
@@ -67,7 +67,7 @@ way.
 
 ## Needs discovery first
 
-Not refused, not promised. Each needs a look at the DSH client and host bundles
+Not refused, not promised. Each needs a look at the harness's client and host bundles
 before anyone can say whether it is possible.
 
 | Idea | What must be checked |
@@ -82,7 +82,7 @@ before anyone can say whether it is possible.
 
 ## Deliberately not planned
 
-- Anything that edits the DSH installation itself. Mods live in the Harness home
+- Anything that edits the harness installation itself. Mods live in the harness home
   and are removed by deleting them.
 - Anything that duplicates a shipped plugin: model selection, permission presets,
   attachments, skills, subagents, jobs, plans, approvals, session export.

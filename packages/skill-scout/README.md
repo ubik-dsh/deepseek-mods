@@ -1,6 +1,6 @@
 # Skill scout
 
-A DSH plugin adding a **Collection** tab to *Settings → Plugins*, one step after
+A harness plugin adding a **Collection** tab to *Settings → Plugins*, one step after
 **Skills**. It is the **collection** of skills already found and judged, and it is what makes
 the search accumulate: the scout reads it *before* it searches, so a skill found once is
 never hunted for again.
@@ -49,10 +49,10 @@ both sides can see and write to.
 | axis | the question |
 |---|---|
 | **Worth keeping** | the verdict of the hearing |
-| **Runs here** | whether it can be used in this Harness at all |
+| **Runs here** | whether it can be used in this harness at all |
 
 They are separate because they diverge. One of the three skills judged so far was a
-gate that hooks a mechanism this Harness does not have: a good idea, competently made,
+gate that hooks a mechanism this harness does not have: a good idea, competently made,
 and unusable here. A single score would have hidden exactly the distinction the
 catalogue exists to keep.
 
@@ -64,7 +64,7 @@ rather than implying otherwise.
 
 ## What it writes
 
-Two files in the Harness home, both owned by this plugin:
+Two files in the harness home, both owned by this plugin:
 
 | file | what |
 |---|---|

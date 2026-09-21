@@ -3,7 +3,7 @@
 **English** · [Русский](AI-INSTALL.ru.md)
 
 A step-by-step procedure for an AI agent asked to install these mods into
-someone's DeepSeek Harness. Follow it in order; every step has a check, and the
+someone's harness. Follow it in order; every step has a check, and the
 troubleshooting table at the end covers what can go wrong.
 
 > Scope: **installing** prebuilt mods. To *create* a mod, use
@@ -11,8 +11,8 @@ troubleshooting table at the end covers what can go wrong.
 
 ## Ground rules
 
-1. **Never modify the DSH installation.** It is the npm/npx package that
-   contains `@deepseek-ai/dsh`. Mods live in the Harness home, not there.
+1. **Never modify the harness installation.** It is the npm/npx package that
+   contains `@deepseek-ai/dsh`. Mods live in the harness home, not there.
 2. **Never restart the user's `dsh web` process without asking.** If you are
    running inside it, restarting ends your own session. Tell the user the exact
    command instead.
@@ -27,7 +27,7 @@ troubleshooting table at the end covers what can go wrong.
 ## Step 1 — locate the environment
 
 ```powershell
-node --version        # must exist; DSH runs on Node
+node --version        # must exist; the harness runs on Node
 $env:DSH_HOME         # empty means the default below
 ```
 
@@ -36,7 +36,7 @@ node --version        # the bash equivalents
 echo "$DSH_HOME"
 ```
 
-The Harness home is `$DSH_HOME`, or `~/.dsh` (`%USERPROFILE%\.dsh` on Windows)
+The harness home is `$DSH_HOME`, or `~/.dsh` (`%USERPROFILE%\.dsh` on Windows)
 when unset. `web` is the browser GUI and the default target.
 
 **A missing home is not a blocker.** Do *not* interrupt the user to "run
@@ -81,7 +81,7 @@ When a server *is* running: the **host** half of a newly inserted row is loaded
 live when the patch file changes, and the **browser** half enters the roster
 when the page loads, so:
 
-- **Reload the page (F5)** — enough when DSH is already running and the row is
+- **Reload the page (F5)** — enough when the harness is already running and the row is
   new.
 - **Restart `dsh web`** — required when a package's *files* changed under a row
   that is already loaded: the loader imports a module once per process and
@@ -126,7 +126,7 @@ boot rows referencing /client.js: …
   OK   dsh-locale-ru
 ```
 
-The probe reads the browser-session secret from the local Harness home, mints
+The probe reads the browser-session secret from the local harness home, mints
 the same cookie the GUI uses, and reports which client rows the served boot
 graph carries. It prints no secret. Exit code is non-zero when a row is missing.
 
@@ -162,13 +162,13 @@ Tell the user exactly:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `dsh` is not found at all | DSH was installed through npx and never linked onto `PATH` | find its launcher and call it with node: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web` |
+| `dsh` is not found at all | The harness was installed through npx and never linked onto `PATH` | find its launcher and call it with node: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web` |
 | `dsh` fails with `…dsh.ps1 cannot be loaded because running scripts is disabled on this system` | PowerShell execution policy blocks the shim on Windows | **Do not change the machine's security policy on your own.** Call the launcher directly instead: `Get-ChildItem "$env:LOCALAPPDATA\npm-cache\_npx" -Recurse -Filter bin.js \| Where-Object FullName -like '*@deepseek-ai\dsh*'`, then `node <that> web --no-open --port <free port>`. Widening the policy (`Set-ExecutionPolicy …`) is a machine-wide change the *user* may choose to make, not a step in this runbook |
 | `boot-check` prints `cannot read the browser-session secret` | the home has never booted, so it has no `.credentials.yaml` yet | start `dsh web` once against that home, then re-run the probe |
 | `boot-check` prints `cannot reach …` | `dsh web` is not running, or a different port | start it, or pass the right URL |
-| `boot-check` prints `the derived cookie was refused` | wrong Harness home (the secret belongs to another install) | set `DSH_HOME` to the home the running server uses |
+| `boot-check` prints `the derived cookie was refused` | wrong harness home (the secret belongs to another install) | set `DSH_HOME` to the home the running server uses |
 | Rows are in the patch file but a mod is missing from the roster | the page was not reloaded, or the row names a package the loader cannot resolve — and a row whose import failed once stays failed | reload; then read the browser console. If it is still missing, check that the package sits in `@local/` under its **own package name** (`@local/dsh-locale-ru` → `dsh-locale-ru`) and restart `dsh web` |
-| The mod is in the roster but its UI is absent | the target slot does not exist in this DSH version | see [Compatibility](../README.md#compatibility); the slot name is version-specific |
+| The mod is in the roster but its UI is absent | the target slot does not exist in this harness version | see [Compatibility](../README.md#compatibility); the slot name is version-specific |
 | Русский is not in the language list | the page was loaded before the pack was installed | reload the page |
 | A mod was working, then it reverted to older behaviour after you edited its files or re-ran the installer | the running process serves the build it loaded at boot — both halves are cached, the host module and the browser bundle | restart `dsh web`; reloading the page is not enough, because the bundle is assembled once and then held in memory |
 | `dsh plugin --profile web …` was run and the mods disappeared | pnpm removed packages the profile manifest does not list | re-run `node tools/install.mjs` |
@@ -184,13 +184,13 @@ restores the patch file to its shipped empty form. Reload the page afterwards.
 
 ## What "installed" means here
 
-Worth knowing when the user asks what happens on a DSH upgrade:
+Worth knowing when the user asks what happens on a harness upgrade:
 
 - The mods are profile plugins: packages under
   `$DSH_HOME/profiles/node_modules/@local/` plus rows in the profile's
   `cordis.patch.yml`.
-- `$DSH_HOME` is **not** part of the DSH installation. Updating or reinstalling
-  DSH replaces the installation and leaves the home — sessions, settings,
+- `$DSH_HOME` is **not** part of the harness installation. Updating or reinstalling
+  the harness replaces the installation and leaves the home — sessions, settings,
   profiles, these mods — intact.
 - The one operation that can drop them is a profile dependency install
   (`dsh plugin --profile <name> …`), which runs pnpm. Re-running
