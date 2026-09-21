@@ -1,0 +1,32 @@
+{
+  "name": "@local/dsh-mcp-store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH plugin: a Settings panel that is a store of MCP servers — a table of server, the operator's own comment and the one-line description an agent reads when deciding whether to reach for that server — plus the tools the agent calls to add, list, update and annotate entries",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "README.md",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-tools": "*"
+  }
+}

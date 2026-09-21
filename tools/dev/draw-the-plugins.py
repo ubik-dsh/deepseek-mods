@@ -24,6 +24,34 @@ GREEN = ("#D5E8D4", "#82B366")
 PURPLE = ("#E1D5E7", "#9673A6")
 ORANGE = ("#FFE6CC", "#D79B00")
 
+# ── LOOK. Not taste - the answers to "it reads like a book description: boxes stacked tightly,
+# no air". Every number is copied from draw-a-skill-flow.py, where the operator looked at the
+# result and called it beautiful.
+TITLE_H = 78        # the diagram's title box: bigger than everything, because it is the entrance
+CARD_H = 106        # a plugin card: what it gives a person, how, its name with files, and the
+                    # English description - four lines, so it is taller than a row of the flow
+SHAPE_H = 66        # a card in the shared-shape column: a name and one line
+GAP = 42            # air between boxes. Below 30 the frames read as one block
+TITLE_GAP = 88      # air under the title - more than GAP, so the entrance reads as an entrance
+BAND_H = 34         # the column header band: it names the column without being a card
+PAD_L = 20          # padding inside a frame: 10 left the text touching the border
+PAD_T = 10          # top padding: 0 pressed the first line against the frame
+MARGIN_X, MARGIN_Y = 90, 60     # page margins: the diagram must not start at the sheet edge
+
+SHAPE_W = 620       # the shared-shape column
+CARD_W = 1180       # the plugin cards - wider, because a card carries three lines
+CARD_X = MARGIN_X + SHAPE_W + GAP
+
+# The vendor palette only, from jgraph/drawio-mcp/shared/style-reference.md.
+BOX = "rounded=1;arcSize=10;whiteSpace=wrap;html=1;shadow=1;strokeWidth=1;"
+TITLE = "rounded=1;arcSize=10;whiteSpace=wrap;html=1;shadow=1;strokeWidth=2;"
+BAND = ("rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;"
+        "align=left;verticalAlign=middle;spacingLeft=20;fontStyle=1;")
+
+# Font ladder: four sizes and each means exactly one thing - the diagram title, a card's title,
+# its explanation, and its name and file list. Not one size for everything.
+F_TITLE, F_STEP, F_DETAIL, F_PATH, F_BAND = 18, 13, 11, 9, 12
+
 # По-русски: что каждый плагин делает для человека. Английское описание остаётся мелким снизу.
 WHAT = {
     "mod-manager": ("Показывает установленные моды и включает/выключает их",
@@ -43,6 +71,23 @@ def esc(text: str) -> str:
     return html.escape(str(text), quote=True)
 
 
+def box(cells: list[str], cell_id: str, label: str, x: int, y: int, w: int, h: int,
+        colours: tuple[str, str]) -> None:
+    """One bordered cell with real padding. The HTML is escaped ONCE, here, on the way in."""
+    cells.append(f'<mxCell id="{esc(cell_id)}" value="{esc(label)}" style="{BOX}'
+                 f'fillColor={colours[0]};strokeColor={colours[1]};align=left;'
+                 f'verticalAlign=middle;spacingLeft={PAD_L};spacingTop={PAD_T};'
+                 f'spacingBottom={PAD_T};fontSize={F_STEP};" vertex="1" parent="1">'
+                 f'<mxGeometry x="{x}" y="{y}" width="{w}" height="{h}" as="geometry" /></mxCell>')
+
+
+def band(cells: list[str], cell_id: str, label: str, x: int, y: int, w: int) -> None:
+    """A column header band: it says what the column IS, without being a card."""
+    cells.append(f'<mxCell id="{esc(cell_id)}" value="{esc(label)}" style="{BAND}'
+                 f'fontSize={F_BAND};" vertex="1" parent="1"><mxGeometry x="{x}" y="{y}" '
+                 f'width="{w}" height="{BAND_H}" as="geometry" /></mxCell>')
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=r"C:\Users\admin\Documents\ds1\_graph\plugins.drawio")
@@ -58,60 +103,81 @@ def main() -> int:
         plugins.append((folder.name, data.get("description", ""), lib))
 
     cells: list[str] = []
-    cells.append('<mxCell id="h" value="ПЛАГИНЫ DSH" style="rounded=0;whiteSpace=wrap;html=1;'
-                 'fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=16;fontStyle=1;" vertex="1" parent="1">'
-                 '<mxGeometry x="70" y="30" width="480" height="48" as="geometry" /></mxCell>')
+    # The diagram's own title box: TITLE_H and strokeWidth 2, so it reads as the entrance and not
+    # as one more card.
+    cells.append(f'<mxCell id="h" value="{esc("ПЛАГИНЫ DSH")}" style="{TITLE}'
+                 f'fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize={F_TITLE};fontStyle=1;'
+                 f'align=center;verticalAlign=middle;" vertex="1" parent="1">'
+                 f'<mxGeometry x="{MARGIN_X}" y="{MARGIN_Y}" width="{CARD_X + CARD_W - MARGIN_X}" '
+                 f'height="{TITLE_H}" as="geometry" /></mxCell>')
+    # A COLUMN HEADER BAND per column, so the reader is told what each column is instead of having
+    # to work it out from the cards.
+    band_y = MARGIN_Y + TITLE_H + TITLE_GAP
+    band(cells, "band_shape", "ОБЩАЯ ФОРМА: у плагина ДВЕ СТОРОНЫ", MARGIN_X, band_y, SHAPE_W)
+    band(cells, "band_cards", "ПЯТЬ ПЛАГИНОВ — что каждый делает для человека",
+         CARD_X, band_y, CARD_W)
 
-    # Общая форма: у каждого плагина две стороны.
-    cells.append('<mxCell id="shape" value="ОБЩАЯ ФОРМА: у плагина ДВЕ СТОРОНЫ" style="text;html=1;'
-                 'align=left;fontSize=13;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" '
-                 'parent="1"><mxGeometry x="70" y="100" width="480" height="26" as="geometry" /></mxCell>')
+    # The shared shape: a name and one line each, the same GAP as everywhere else.
+    y = band_y + BAND_H + GAP
     for i, (name, why, colours) in enumerate([
             ("lib/index.js", "серверная сторона: то, что живёт в процессе DSH", GREEN),
             ("lib/client.js", "клиентская сторона: кнопка, панель, то, что видно на странице", BLUE),
             ("package.json", "объявляет обе стороны — без него плагин не смонтируется", GREY)]):
-        label = (f'<b>{name}</b><br><font color="#444444" style="font-size:11px">{why}</font>')
-        cells.append(f'<mxCell id="f{i}" value="{esc(label)}" style="rounded=1;whiteSpace=wrap;html=1;'
-                     f'fillColor={colours[0]};strokeColor={colours[1]};align=left;spacingLeft=10;'
-                     f'fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="{140 + i * 66}" '
-                     f'width="480" height="56" as="geometry" /></mxCell>')
+        label = (f'<b>{name}</b><br>'
+                 f'<font color="#444444" style="font-size:{F_DETAIL}px">{why}</font>')
+        box(cells, f"f{i}", label, MARGIN_X, y, SHAPE_W, SHAPE_H, colours)
+        y += SHAPE_H + GAP
+    shape_bottom = y - GAP
 
-    y = 380
+    y = band_y + BAND_H + GAP
     for index, (name, english, lib) in enumerate(plugins):
         russian, why, colours = WHAT.get(name, (name, "", GREY))
         files = ", ".join(lib) if lib else "—"
+        # Three sizes doing three jobs: what it gives a person (13), how (11), and its name with
+        # its files plus the English description (9) - never one size for all of it.
         label = (f'<b>{russian}</b><br>'
-                 f'<font color="#444444" style="font-size:11px">{why}</font><br>'
-                 f'<font color="#999999" style="font-size:9px">{name} · {files}</font><br>'
-                 f'<font color="#AAAAAA" style="font-size:8px">{english[:110]}</font>')
-        cells.append(f'<mxCell id="p{index}" value="{esc(label)}" style="rounded=1;whiteSpace=wrap;'
-                     f'html=1;fillColor={colours[0]};strokeColor={colours[1]};align=left;spacingLeft=10;'
-                     f'fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="{y}" width="900" '
-                     f'height="86" as="geometry" /></mxCell>')
-        y += 102
+                 f'<font color="#444444" style="font-size:{F_DETAIL}px">{why}</font><br>'
+                 f'<font color="#999999" style="font-size:{F_PATH}px">{name} · {files}</font><br>'
+                 f'<font color="#999999" style="font-size:{F_PATH}px">{english[:110]}</font>')
+        box(cells, f"p{index}", label, CARD_X, y, CARD_W, CARD_H, colours)
+        y += CARD_H + GAP
+    cards_bottom = y - GAP
 
-    legend = ["ЧТО ЭТО ЗА СХЕМА",
-              "Пять плагинов DSH: что каждый делает и какая форма у них общая.",
-              "Это НЕ схема скиллов (family.drawio) и НЕ ворота регламента (gates.drawio).",
-              "",
-              "КАК ЧИТАТЬ",
-              "Сверху — общая форма плагина: две стороны и манифест, который их объявляет.",
-              "Ниже — каждый плагин: что он даёт человеку, как называется, из чего состоит.",
-              "",
-              "ЧТО У НИХ ОБЩЕГО",
-              "Все пять монтируются БЕЗ перезапуска и все показываются в Настройках.",
-              "Три из них — панели одного вида: список, состояние и переключатель."]
-    for row, text in enumerate(legend):
-        bold = "1" if (text.isupper() or text.startswith("ЧТО") or text.startswith("КАК")) else "0"
-        # row is in the Y COORDINATE - see draw-a-skill-flow.py, where leaving it out drew the whole
-        # legend on one spot.
-        cells.append(f'<mxCell id="l{row}" value="{esc(text)}" style="text;html=1;align=left;'
-                     f'verticalAlign=middle;fontSize=12;fontStyle={bold};strokeColor=none;fillColor=none;"'
-                     f' vertex="1" parent="1"><mxGeometry x="1010" y="{140 + row * 30}" width="660" '
-                     f'height="26" as="geometry" /></mxCell>')
+    # ЛЕГЕНДА ПАНЕЛЬЮ, А НЕ СПИСКОМ СТРОК: строки без рамки читаются как продолжение карточек и
+    # глазом не отделяются от них. HTML собирается НАСТОЯЩИМИ <b> и <br> и экранируется РОВНО
+    # ОДИН РАЗ, в legend_value - двойное экранирование рисует разметку текстом.
+    legend_rows = [
+        ("ЧТО ЭТО ЗА СХЕМА",
+         ["Пять плагинов DSH: что каждый делает и какая форма у них общая.",
+          "Это НЕ схема скиллов (family.drawio) и НЕ ворота регламента (gates.drawio)."]),
+        ("КАК ЧИТАТЬ",
+         ["Сверху — общая форма плагина: две стороны и манифест, который их объявляет.",
+          "Ниже — каждый плагин: что он даёт человеку, как называется, из чего состоит."]),
+        ("ЧТО У НИХ ОБЩЕГО",
+         ["Все пять монтируются БЕЗ перезапуска и все показываются в Настройках.",
+          "Три из них — панели одного вида: список, состояние и переключатель."]),
+    ]
+    parts: list[str] = []
+    for heading, lines in legend_rows:
+        parts.append(f'<b>{esc(heading)}</b>')
+        parts.extend(esc(line) for line in lines)
+        parts.append("&nbsp;")
+    legend_html = "<br>".join(parts)
+    legend_h = 34 + sum(len(lines) + 1 for _, lines in legend_rows) * 22 + 16
+    legend_y = max(cards_bottom, shape_bottom) + GAP
+    cells.append(f'<mxCell id="legend" value="{esc(legend_html)}" style="{BOX}'
+                 f'fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;verticalAlign=top;'
+                 f'spacingLeft={PAD_L};spacingTop={PAD_T};fontSize={F_DETAIL};" vertex="1" '
+                 f'parent="1"><mxGeometry x="{MARGIN_X}" y="{legend_y}" '
+                 f'width="{CARD_X + CARD_W - MARGIN_X}" height="{legend_h}" as="geometry" />'
+                 f'</mxCell>')
 
+    # The page is measured from the content, not fixed.
+    page_w = CARD_X + CARD_W + MARGIN_X
+    page_h = legend_y + legend_h + MARGIN_Y
     model = ('<mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" '
-             'arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" '
+             'arrows="1" fold="1" page="1" pageScale="1" '
+             f'pageWidth="{page_w}" pageHeight="{page_h}" math="0" '
              'shadow="0"><root><mxCell id="0" /><mxCell id="1" parent="0" />' + "".join(cells)
              + '</root></mxGraphModel>')
     model = ('<mxfile host="dsh" agent="draw-the-plugins.py"><diagram id="plugins" name="Плагины">'
