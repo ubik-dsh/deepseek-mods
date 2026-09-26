@@ -1,7 +1,12 @@
 """Проверка ворот: чистая колода проходит, испорченная — ловится по каждой поломке.
 
 Смысл не в том, что «скрипт запустился», а в том, что он РАЗЛИЧАЕТ. Колода
-портится нарочно четырьмя способами, и ворота обязаны назвать каждый.
+портится нарочно пятью способами, и ворота обязаны назвать каждый.
+
+Пятая поломка — метаданные: колода, собранная из шаблона python-pptx и не
+правившая свойства пакета, уезжает с `lastModifiedBy: Steve Canny`, датой
+27.01.2013 и подписью «generated using python-pptx» в описании. Найти это
+глазами можно, а ворота этого не видели.
 
     python test-deck-gates.py
 """
@@ -12,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 from pptx import Presentation
@@ -35,6 +41,16 @@ def blank_deck(path: Path, *, broken: bool) -> None:
     for paragraph in body.text_frame.paragraphs:
         for run in paragraph.runs:
             run.font.size = Pt(14)
+
+    if not broken:
+        # У готовой колоды свойства пакета заполнены. Без них ворота справедливо
+        # ругаются: даты из шаблона описывают не этот файл.
+        core = deck.core_properties
+        core.title = "Проверочная колода"
+        core.author = "test-deck-gates"
+        core.last_modified_by = "test-deck-gates"
+        core.comments = "собрана тестом ворот"
+        core.created = core.modified = datetime.now()
 
     if broken:
         # 1. слишком мелкий шрифт
@@ -67,6 +83,11 @@ def blank_deck(path: Path, *, broken: bool) -> None:
         table.cell(2, 0).text = "Итого"
         table.cell(2, 1).text = "250"
 
+        # 5. шапка шаблона python-pptx: чужое имя, подпись генератора, дата 2013
+        core = deck.core_properties
+        core.comments = "generated using python-pptx"
+        core.last_modified_by = "Steve Canny"
+
     deck.save(str(path))
 
 
@@ -81,9 +102,10 @@ def main() -> int:
     try:
         clean = work / "clean.pptx"
         blank_deck(clean, broken=False)
-        code, report = run(clean)
-        assert code == 0, f"чистая колода не прошла: {report['findings']}"
-        assert not report["findings"], f"на чистой колоде выдуманы находки: {report['findings']}"
+        code, clean_report = run(clean)
+        assert code == 0, f"чистая колода не прошла: {clean_report['findings']}"
+        assert not clean_report["findings"], \
+            f"на чистой колоде выдуманы находки: {clean_report['findings']}"
         print("ok  1. чистая колода проходит, находок нет")
 
         broken = work / "broken.pptx"
@@ -91,7 +113,7 @@ def main() -> int:
         code, report = run(broken)
         kinds = {item["kind"] for item in report["findings"]}
         assert code == 1, "испорченная колода прошла как чистая"
-        for kind in ("шрифт", "за краем", "заглушка", "числа"):
+        for kind in ("шрифт", "за краем", "заглушка", "числа", "метаданные"):
             assert kind in kinds, f"ворота не заметили «{kind}»; нашли только {kinds}"
         print(f"ok  2. испорченная колода не проходит: {sorted(kinds)}")
 
@@ -107,6 +129,23 @@ def main() -> int:
         tiny = next(item for item in report["findings"] if item["kind"] == "шрифт")
         assert "6" in tiny["text"], f"в находке про шрифт нет размера: {tiny['text']}"
         print("ok  5. назван размер шрифта")
+
+        meta = [item["text"] for item in report["findings"] if item["kind"] == "метаданные"]
+        assert len(meta) >= 3, f"метаданные-наследие названы не все: {meta}"
+        joined = " | ".join(meta)
+        for mark in ("Steve Canny", "generated using python-pptx", "2013"):
+            assert mark in joined, f"в находках про метаданные нет «{mark}»: {joined}"
+        assert all(item["slide"] == 0 for item in report["findings"]
+                   if item["kind"] == "метаданные"), \
+            "метаданные — свойство пакета, а не слайда: слайд должен быть 0"
+        print("ok  6. метаданные-наследие названы: чужое имя, подпись генератора, дата 2013")
+
+        core = clean_report["package"]
+        assert core["author"] == "test-deck-gates", \
+            f"в отчёт не попали свойства пакета: {core}"
+        assert core["last_modified_by"] == "test-deck-gates", \
+            f"в отчёте чужое имя последнего автора: {core}"
+        print("ok  7. свойства пакета попадают в отчёт, а не только в находки")
 
         print("\nPASS — ворота проверены")
         return 0

@@ -19,6 +19,8 @@ Proprietary) главное — не сборка слайдов, а ВОРОТ�
     текст      остатки-заглушки (TODO, lorem, XXX), слишком много слов на слайде
     числа      суммы в таблицах против заявленного «Итого»
     заголовки  разнобой размеров заголовков между слайдами
+    метаданные наследие шаблона: чужое имя в lastModifiedBy, дата 2013 года,
+               подпись «generated using python-pptx» в описании пакета
 
 ЧЕГО НЕ ДЕЛАЕТ. Не оценивает смысл и красоту. «Абзац не влез» здесь — ОЦЕНКА по
 площади и кеглю, а не измерение переноса строк: честно помечается словом оценка.
@@ -36,6 +38,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 if sys.stdout is not None:
@@ -49,6 +52,73 @@ TOTAL_WORD = re.compile(r"^(итого|всего|total|sum)\b", re.IGNORECASE)
 # Зазор на «вылет» за край: тень, обводка и выноски иногда выходят на пару
 # миллиметров намеренно. Всё, что дальше, — уже ошибка вёрстки.
 BLEED_EMU = Emu(91440)  # 0,1 дюйма
+
+# Наследие шаблона python-pptx. Колода, собранная из `Presentation()` без правки
+# свойств пакета, уезжает с шапкой 2013 года: в описании — подпись генератора, в
+# `lastModifiedBy` — имя автора шаблона, в датах — день, когда шаблон собрали.
+# Получатель открывает свойства файла и читает там чужое имя и чужой год.
+# Проверка машинная: это строки, а не впечатление.
+TEMPLATE_LEFTOVERS = (
+    ("описание пакета", re.compile(r"generated using python-pptx", re.IGNORECASE),
+     "так python-pptx подписывает колоду, собранную из его шаблона"),
+    ("последний автор", re.compile(r"^Steve Canny$", re.IGNORECASE),
+     "имя автора шаблона python-pptx, а не того, кто собрал колоду"),
+)
+
+# Дата из шаблона стареет молча, поэтому ловится не по числу, а по сравнению с
+# самим файлом: метаданные, написанные больше года назад, описывают не его.
+STALE_DAYS = 365
+
+
+def gate_metadata(path: Path, deck) -> tuple[list[dict], list[dict]]:
+    """Свойства пакета: не осталось ли в колоде шапки чужого шаблона.
+
+    Возвращает (находки, замечания). Находка — чужое имя, подпись генератора или
+    даты, которые не описывают этот файл. Замечание — метаданные просто пустые.
+    """
+    findings: list[dict] = []
+    warns: list[dict] = []
+    try:
+        core = deck.core_properties
+        fields = {
+            "описание пакета": core.comments,
+            "последний автор": core.last_modified_by,
+            "автор": core.author,
+        }
+    except Exception as error:  # свойства пакета не читаются — это тоже находка
+        return [{"kind": "метаданные", "slide": 0,
+                 "text": f"свойства пакета не читаются: {type(error).__name__}"}], warns
+
+    for label, pattern, why in TEMPLATE_LEFTOVERS:
+        value = fields.get(label) or ""
+        if pattern.search(value.strip()):
+            findings.append({
+                "kind": "метаданные", "slide": 0,
+                "text": f"{label}: «{value.strip()}» — {why}",
+            })
+
+    # Тот же след, но без списка имён: даты из шаблона не совпадают с файлом.
+    for label, when in (("создано", core.created), ("изменено", core.modified)):
+        if when is None:
+            continue
+        try:
+            age = datetime.fromtimestamp(path.stat().st_mtime) - when
+        except (OSError, OverflowError, ValueError):
+            continue
+        if age > timedelta(days=STALE_DAYS):
+            findings.append({
+                "kind": "метаданные", "slide": 0,
+                "text": f"{label} {when:%d.%m.%Y} — раньше самого файла на {age.days} дн.; "
+                        f"похоже, дата досталась от шаблона, а не от сборки",
+            })
+
+    if not (core.title or "").strip():
+        warns.append({"kind": "метаданные", "slide": 0,
+                      "text": "в свойствах пакета не назван заголовок колоды"})
+    if not (core.author or "").strip():
+        warns.append({"kind": "метаданные", "slide": 0,
+                      "text": "в свойствах пакета не назван автор колоды"})
+    return findings, warns
 
 
 def emu_to_cm(value: int) -> float:
@@ -158,6 +228,11 @@ def gates(path: Path, min_font: float, max_words: int) -> dict:
     unknown_runs = 0
     slide_count = 0
 
+    # Свойства пакета проверяются один раз на файл, а не на слайд.
+    metadata_findings, metadata_warns = gate_metadata(path, deck)
+    findings.extend(metadata_findings)
+    warns.extend(metadata_warns)
+
     for number, slide in enumerate(deck.slides, start=1):
         slide_count += 1
         words = 0
@@ -218,10 +293,19 @@ def gates(path: Path, min_font: float, max_words: int) -> dict:
         findings.extend(check_tables(slide, number))
 
     title_report = "разнобой" if len(set(title_sizes)) > 1 else "одинаковые"
+    core = deck.core_properties
     return {
         "file": str(path),
         "slides": slide_count,
         "slide_cm": [emu_to_cm(width), emu_to_cm(height)],
+        "package": {
+            "title": core.title,
+            "author": core.author,
+            "last_modified_by": core.last_modified_by,
+            "comments": core.comments,
+            "created": core.created.isoformat() if core.created else None,
+            "modified": core.modified.isoformat() if core.modified else None,
+        },
         "runs_without_size": unknown_runs,
         "title_sizes": sorted(set(title_sizes)),
         "title_consistency": title_report,
@@ -269,6 +353,10 @@ def main() -> int:
     else:
         print(f"колода: {args.deck.name}")
         print(f"слайдов: {report['slides']}, размер {report['slide_cm'][0]}x{report['slide_cm'][1]} см")
+        package = report["package"]
+        print(f"свойства пакета: автор {package['author'] or '—'}, "
+              f"последним правил {package['last_modified_by'] or '—'}, "
+              f"создано {package['created'] or '—'}")
         print(f"размеры в верхней четверти: {report['title_sizes']} — {report['title_consistency']} "
               f"(разнобой сам по себе не дефект: заголовок и подзаголовок разного кегля — норма)")
         if report["runs_without_size"]:
@@ -276,13 +364,15 @@ def main() -> int:
         if report["findings"]:
             print(f"\nНЕ ПРОХОДИТ ({len(report['findings'])}):")
             for item in report["findings"]:
-                print(f"  слайд {item['slide']:<3} {item['kind']:<10} {item['text']}")
+                where = "пакет" if item["slide"] == 0 else f"слайд {item['slide']}"
+                print(f"  {where:<6} {item['kind']:<10} {item['text']}")
         else:
             print("\nжёсткие ворота пройдены")
         if report["warnings"]:
             print(f"\nзамечания ({len(report['warnings'])}):")
             for item in report["warnings"][:12]:
-                print(f"  слайд {item['slide']:<3} {item['kind']:<18} {item['text']}")
+                where = "пакет" if item["slide"] == 0 else f"слайд {item['slide']}"
+                print(f"  {where:<6} {item['kind']:<18} {item['text']}")
     if args.render:
         print(render(args.deck, args.render))
 
