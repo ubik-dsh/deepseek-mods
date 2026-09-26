@@ -1,5 +1,9 @@
 """Проверка сравнения: одинаковые версии — ноль, изменённая страница — ловится.
 
+И проверка второго вида вывода: overlay говорит ГДЕ, пара «до/после» — КУДА.
+Прямоугольник во второй версии уехал на 50 pt вниз, и инструмент обязан это назвать,
+а не оставить человеку догадываться по красному пятну.
+
     python test-render-and-diff.py
 """
 from __future__ import annotations
@@ -10,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 import pymupdf
+from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 SCRIPT = HERE / "render_and_diff.py"
@@ -63,10 +68,27 @@ def main() -> int:
     assert second_page > 1.0, f"вторая страница поехала, а показала всего {second_page}%"
     print(f"ok  3. числа разделяют страницы: первая {first_page:.3f}%, вторая {second_page:.3f}%")
 
-    differences = sorted((work / "out-после").glob("стр-*.png"))
+    differences = sorted((work / "out-после").glob("стр-[0-9][0-9][0-9].png"))
     assert len(differences) == 2, f"картинок различий {len(differences)}, ждали 2"
     assert differences[0].stat().st_size > 500, "картинка различий пустая"
     print("ok  4. картинки различий на месте и не пустые")
+
+    pairs = sorted((work / "out-после").glob("стр-*-бок-о-бок.png"))
+    assert len(pairs) == 2, f"парных картинок {len(pairs)}, ждали 2"
+    overlay = Image.open(differences[0])
+    pair = Image.open(pairs[0])
+    assert pair.width > overlay.width * 1.5, \
+        f"пара не шире overlay: {pair.size} против {overlay.size} — это не «бок о бок»"
+    assert pair.height > overlay.height, f"у пары нет полосы с подписями: {pair.size}"
+    assert pairs[0].stat().st_size > 500, "парная картинка пустая"
+    print(f"ok  5. рядом с overlay лежит пара «до/после»: {pair.size} против {overlay.size}")
+
+    shifts = [line.strip() for line in text.splitlines() if "сдвиг изменившейся части" in line]
+    assert len(shifts) == 1, f"строк про сдвиг {len(shifts)}, ждали одну (только стр. 2): {shifts}"
+    assert "вниз" in shifts[0], f"направление сдвига названо неверно: {shifts[0]}"
+    assert "вверх" not in shifts[0], f"направление названо наоборот: {shifts[0]}"
+    assert "50 pt" in shifts[0], f"величина сдвига не названа: {shifts[0]}"
+    print(f"ok  6. направление и величина названы: {shifts[0]}")
 
     print("\nPASS — сравнение версий проверено")
     return 0
