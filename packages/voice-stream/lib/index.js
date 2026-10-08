@@ -23,8 +23,8 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join } from 'node:path'
 
 /** Cordis plugin name. */
 export const name = 'voice-stream'
@@ -46,11 +46,72 @@ export const DEFAULTS = {
   idleStopMs: 600000,
   /** Читать ли ответы подагентов: у них свои сеансы и своя болтовня. */
   readSubagents: false,
+  /** Проговаривать ли короткие подводки, пока ответ ещё готовится. */
+  fillers: true,
+  /** Сколько тишины терпеть, прежде чем сказать «работаю». */
+  workAfterMs: 12000,
+  /** Не чаще, чем раз в это время, напоминать, что работа идёт. */
+  workRepeatMs: 30000,
+  /** Сколько подводок на один ход: дальше это уже болтовня. */
+  maxFillersPerTurn: 4,
 }
 
 /** Message of an unknown thrown value. */
 function messageOf(error) {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Русское окончание после числа: 1 секунду, 2 секунды, 5 секунд. */
+export function plural(count, one, few, many) {
+  const mod100 = count % 100
+  const mod10 = count % 10
+  if (mod100 >= 11 && mod100 <= 14) return many
+  if (mod10 === 1) return one
+  if (mod10 >= 2 && mod10 <= 4) return few
+  return many
+}
+
+/**
+ * Как сказать про ожидание.
+ *
+ * Правило оператора: до минуты называть секунды, дальше минуты. Врать нельзя: фраза
+ * говорится перед ожиданием, поэтому она должна совпадать с тем, сколько ждать придётся.
+ */
+export function describeWait(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null
+  if (seconds < 60) {
+    const value = Math.round(seconds)
+    return `Подождём ${value} ${plural(value, 'секунду', 'секунды', 'секунд')}.`
+  }
+  const minutes = Math.max(1, Math.round(seconds / 60))
+  // «Подождём одну минуту» звучит как отчёт; живая речь говорит «подождём минуту».
+  if (minutes === 1) return 'Подождём минуту.'
+  return `Подождём ${minutes} ${plural(minutes, 'минуту', 'минуты', 'минут')}.`
+}
+
+/**
+ * Найти в аргументах инструмента НАЗНАЧЕННОЕ ожидание, в секундах.
+ *
+ * Только явные паузы: `Start-Sleep -Seconds`, `timeout /t`, `sleep N`. Предел времени
+ * (`timeoutMs`) сюда не берём нарочно: это граница, а не ожидание, и объявлять по нему
+ * «подождём десять минут» для команды, которая кончится через три секунды, значит соврать.
+ */
+export function waitFromArguments(text) {
+  if (typeof text !== 'string' || text === '') return null
+  const seconds = [
+    /Start-Sleep\s+-Seconds\s+(\d+)/iu,
+    /Start-Sleep\s+-Milliseconds\s+(\d+)/iu,
+    /timeout\s+\/t\s+(\d+)/iu,
+    /--sleep\s+(\d+)/iu,
+    /\bsleep\s+(\d+)\b/iu,
+  ]
+  for (const pattern of seconds) {
+    const found = pattern.exec(text)
+    if (found !== null) return Number(found[1])
+  }
+  const milliseconds = /Start-Sleep\s+-Milliseconds\s+(\d+)/iu.exec(text)
+  if (milliseconds !== null) return Number(milliseconds[1]) / 1000
+  return null
 }
 
 /**
@@ -93,6 +154,11 @@ export class VoiceStream {
     this.nextId = 1
     this.spoken = 0
     this.idle = null
+    /** Текущий ход и учёт подводок: тишину заполняем, но не болтаем. */
+    this.turn = null
+    this.fillersPlayed = 0
+    this.lastSpokenAt = 0
+    this.lastFillerAt = 0
   }
 
   start() {
@@ -112,7 +178,7 @@ export class VoiceStream {
           try {
             const reply = JSON.parse(line)
             if (reply.spoken !== undefined) {
-              this.onLog(`voice-stream: кусок ${reply.id} прочитан (${reply.spoken} знаков, синтез ${reply.synthSeconds} с)`)
+              this.onLog(`voice-stream: кусок ${reply.id} прочитан (${reply.spoken} знаков, синтез ${reply.synthSeconds} с, ${reply.played ? 'сыграл' : 'молчал'})`)
             }
           } catch {
             // Строку уже записал сам голосовой процесс; здесь она не нужна.
@@ -186,6 +252,62 @@ export class VoiceStream {
     this.child?.stdin.write(`${JSON.stringify({ id, text: piece })}\n`)
   }
 
+  /**
+   * Сказать короткую подводку из кэша голоса.
+   *
+   * Ради этого подводки и заготовлены заранее: синтеза нет вовсе, только проигрыш,
+   * поэтому первое слово звучит за доли секунды. Номер выбирает вызывающий, чтобы
+   * «так» не звучало каждый раз одинаково.
+   */
+  filler(which) {
+    this.start()
+    if (this.idle !== null) {
+      clearTimeout(this.idle)
+      this.idle = null
+    }
+    const id = this.nextId
+    this.nextId += 1
+    this.fillersPlayed += 1
+    this.lastSpokenAt = Date.now()
+    this.lastFillerAt = Date.now()
+    this.onLog(`voice-stream: подводка ${which} (всего ${this.fillersPlayed} за ход)`)
+    this.child?.stdin.write(`${JSON.stringify({ command: 'filler', id, which })}\n`)
+  }
+
+  /** Сказать служебную фразу, которую нужно синтезировать: например про ожидание. */
+  announce(text) {
+    if (typeof text !== 'string' || text.trim() === '') return
+    this.onLog(`voice-stream: объявляю ожидание: ${text}`)
+    this.say(text)
+  }
+
+  /** Начался новый ход: считаем подводки заново. */
+  startTurn(turn) {
+    this.turn = turn
+    this.fillersPlayed = 0
+    this.lastSpokenAt = Date.now()
+    this.lastFillerAt = 0
+  }
+
+  /**
+   * Такт раз в пару секунд: если работа идёт, а голос молчит, сказать, что работаем.
+   *
+   * Это ровно то, что делает голосовой режим у больших ассистентов: тишину не оставляют
+   * пустой, иначе человек решает, что его не услышали. Но и болтать нельзя: подводок
+   * на ход ограниченное число, и повтор не чаще `workRepeatMs`.
+   */
+  tick() {
+    if (this.turn === null) return 'нет хода'
+    if (this.fillersPlayed >= this.config.maxFillersPerTurn) return 'лимит подводок'
+    const now = Date.now()
+    if (now - this.lastSpokenAt < this.config.workAfterMs) return 'рано'
+    if (now - this.lastFillerAt < this.config.workRepeatMs) return 'недавно говорил'
+    // Разные подводки по очереди: 5 «понял, работаю», 9 «работаю, подожди», 7 «ещё немного».
+    const rotation = [5, 7, 9]
+    this.filler(rotation[this.fillersPlayed % rotation.length])
+    return 'сказал'
+  }
+
   stop(reason = 'voice-stream: плагин выгружен') {
     if (this.idle !== null) {
       clearTimeout(this.idle)
@@ -215,6 +337,37 @@ export function validateConfig(raw) {
   return config
 }
 
+/** Exact route below `/api` owned by this mod: the panel's voice switch. */
+export const MOD_ROUTE_PATH = '/api/voice-stream.mod'
+
+/**
+ * Включён ли голос по файлу-переключателю.
+ *
+ * Тот же файл, что читает `speak.py`, поэтому кнопка в панели, лампа и голосовой
+ * процесс говорят об одном и том же состоянии, и второго переключателя не заводится.
+ */
+export function readVoiceOn(statePath) {
+  try {
+    return readFileSync(statePath, 'utf8').trim().toUpperCase() !== 'ВЫКЛ'
+  } catch {
+    // Файла нет — голос включён: так же решает и speak.py.
+    return true
+  }
+}
+
+/** Записать переключатель голоса. */
+export function writeVoiceOn(statePath, on) {
+  writeFileSync(statePath, on ? 'ВКЛ' : 'ВЫКЛ', 'utf8')
+}
+
+/** Ответ маршрута в формате, который ждёт браузерная половина. */
+function json(value, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+  })
+}
+
 /**
  * Подписаться на живой поток текста и читать его вслух.
  * @param ctx - host context.
@@ -237,22 +390,101 @@ export function apply(ctx, rawConfig) {
     return !(typeof depth === 'number' && depth > 0)
   }
 
+  /** Аргументы вызовов инструментов в этом ответе: из них берём назначенное ожидание. */
+  let toolArguments = ''
+  let announcedWaits = new Set()
+
   ctx.on('agent/assistant-stream', ({ agent, frame }) => {
     if (frame === undefined || !isLead(agent)) return
     if (frame.type === 'start') {
+      // Новый ход: заводим счётчики и сразу говорим короткую подводку из кэша, чтобы
+      // тишина не висела, пока модель думает и пока идут инструменты.
+      if (voice.turn !== frame.turn) {
+        voice.startTurn(frame.turn)
+        toolArguments = ''
+        announcedWaits = new Set()
+        if (config.fillers) voice.filler(1)
+      }
       voice.begin()
       return
     }
     if (frame.type === 'chunk') {
+      const chunk = frame.chunk
       // Читаем ровно видимый ответ: размышления и вызовы инструментов вслух не нужны.
-      if (frame.chunk?.type === 'text-delta' && typeof frame.chunk.text === 'string') voice.feed(frame.chunk.text)
+      if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') {
+        voice.feed(chunk.text)
+        voice.lastSpokenAt = Date.now()
+        return
+      }
+      if (chunk?.type === 'tool-call-delta' && typeof chunk.argumentsDelta === 'string') {
+        // Аргументы приходят по кускам. Собираем и смотрим, не назначена ли пауза:
+        // «подождём 59 секунд» говорится ДО ожидания, поэтому её надо назвать заранее.
+        toolArguments += chunk.argumentsDelta
+        const wait = waitFromArguments(toolArguments)
+        if (wait !== null) {
+          const phrase = describeWait(wait)
+          if (phrase !== null && !announcedWaits.has(phrase)) {
+            announcedWaits.add(phrase)
+            voice.announce(phrase)
+          }
+        }
+      }
       return
     }
-    if (frame.type === 'end') voice.flush()
+    if (frame.type === 'end') {
+      voice.flush()
+      toolArguments = ''
+    }
   }, { global: true })
 
-  ctx.logger?.info?.(`voice-stream: читаю ответы вслух по мере печати (кусок от ${config.firstChunk} знаков)`)
-  ctx.effect(() => () => voice.stop(), 'voice-stream: life of the voice process')
+  // Такт: пока работа идёт и голос молчит, напоминаем о себе подводкой из кэша.
+  const timer = setInterval(() => {
+    if (!config.fillers) return
+    const decision = voice.tick()
+    if (decision === 'сказал') ctx.logger?.debug?.('voice-stream: сказал, что работаю')
+  }, 2000)
+  timer.unref?.()
+
+  ctx.logger?.info?.(
+    `voice-stream: читаю ответы вслух по мере печати (кусок от ${config.firstChunk} знаков, `
+    + `подводки ${config.fillers ? 'включены' : 'выключены'})`)
+
+  // Кнопка в панели. Маршрут поднимаем только если служба связи есть: чтение вслух
+  // не должно зависеть от неё, а без панели оно работает и так.
+  const statePath = join(dirname(config.streamPath), 'ГОЛОС.txt')
+  let disposeRoute = null
+  if (ctx.connection?.fetch?.register !== undefined) {
+    disposeRoute = ctx.connection.fetch.register({
+      path: MOD_ROUTE_PATH,
+      methods: ['GET', 'POST'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method === 'GET') return json({ on: readVoiceOn(statePath), statePath })
+        let payload = null
+        try {
+          payload = await request.json()
+        } catch {
+          return json({ ok: false, error: 'тело запроса должно быть JSON' }, 400)
+        }
+        if (typeof payload?.on !== 'boolean') return json({ ok: false, error: 'нужно поле on: true или false' }, 400)
+        try {
+          writeVoiceOn(statePath, payload.on)
+        } catch (error) {
+          return json({ ok: false, error: `переключатель не записался: ${messageOf(error)}` }, 500)
+        }
+        ctx.logger?.info?.(`voice-stream: голос ${payload.on ? 'включён' : 'выключен'} кнопкой в панели`)
+        return json({ on: readVoiceOn(statePath), statePath })
+      },
+    })
+  } else {
+    ctx.logger?.debug?.('voice-stream: службы связи нет, кнопка в панели не поднята')
+  }
+
+  ctx.effect(() => () => {
+    clearInterval(timer)
+    voice.stop()
+    void disposeRoute?.()
+  }, 'voice-stream: life of the voice process')
 }
 
 export default { name, inject, apply }

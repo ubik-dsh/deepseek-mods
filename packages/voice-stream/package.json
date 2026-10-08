@@ -1,20 +1,27 @@
 {
   "name": "@local/dsh-voice-stream",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "DSH plugin: read the assistant's answer aloud as it is being written, by hooking the live agent/assistant-stream frames instead of waiting for the finished message in the session log",
+  "description": "DSH plugin: read the assistant's answer aloud as it is being written, with pre-synthesized filler phrases, spoken wait announcements, and a panel button that mutes the voice",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
+    "lib/client.js",
     "README.md",
     "README.ru.md"
   ],
   "license": "MIT",
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2"
   }

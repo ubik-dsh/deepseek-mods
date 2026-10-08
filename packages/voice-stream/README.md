@@ -29,6 +29,31 @@ and reads the answer as it arrives.
 - Subagents are skipped: their sessions carry `delegationDepth > 0`, and reading their chatter
   aloud would be noise. `readSubagents: true` overrides that.
 
+### Filler phrases: the voice cache
+
+Wait time is covered the way the big voice assistants do it, and the operator asked for it:
+short phrases spoken from a **pre-synthesized cache**, so the first sound costs nothing at
+all. `_voice\say_stream.py` synthesizes the list once at startup into `_voice\voices\fillers\`
+and then only plays those files back; a phrase goes out at the start of every turn, and
+further ones when work drags on (`workAfterMs`, at most `maxFillersPerTurn` per turn, no
+oftener than `workRepeatMs`).
+
+Announced waits are synthesized on demand instead, because their text varies: when a tool
+call carries an explicit pause (`Start-Sleep -Seconds 59`, `timeout /t 30`, `--sleep 5`),
+the mod says "Подождём 59 секунд." before the wait starts. Under a minute it names seconds,
+over a minute minutes — the operator's rule. A time *limit* (`timeoutMs`) is deliberately not
+treated as a wait: announcing "ten minutes" for a command that ends in three seconds would be
+a lie.
+
+### The button in the panel
+
+The only control is one button in the session header's utilities row: it shows whether
+answers are read aloud and switches that with a click. It writes the same switch file the
+voice process reads (`_voice\ГОЛОС.txt`), so the panel, the lamp and the voice itself always
+agree. The route is `/api/voice-stream.mod`; the browser half uses nothing but baseline
+modules and asks for the `slots` service. With no `connection` service mounted (a headless
+run) the reading still works and only the button is absent.
+
 ## Configuration
 
 One loader row in `~/.dsh/profiles/web/cordis.patch.yml`:
@@ -51,6 +76,10 @@ One loader row in `~/.dsh/profiles/web/cordis.patch.yml`:
 | `maxChars` | `6000` | how much of one answer is read at all |
 | `idleStopMs` | `600000` | release the voice process after this much silence |
 | `readSubagents` | `false` | also read subagent text |
+| `fillers` | `true` | speak short filler phrases from the cache |
+| `workAfterMs` | `12000` | silence before saying "работаю" |
+| `workRepeatMs` | `30000` | how often that reminder may repeat |
+| `maxFillersPerTurn` | `4` | filler phrases per turn, after that it is chatter |
 
 ## Installing and checking
 
