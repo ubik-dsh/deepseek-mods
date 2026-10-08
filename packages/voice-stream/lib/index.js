@@ -29,8 +29,18 @@ import { dirname, isAbsolute, join } from 'node:path'
 /** Cordis plugin name. */
 export const name = 'voice-stream'
 
-/** No injected service: the streaming event is published on the process-wide dispatch. */
-export const inject = []
+/**
+ * Служба связи: нужна для кнопки в панели.
+ *
+ * ОБЪЯВЛЯТЬ ОБЯЗАТЕЛЬНО, И ЭТО НЕ ФОРМАЛЬНОСТЬ. Первая версия читала `ctx.connection`
+ * «на всякий случай», необязательной цепочкой, а объявляла `inject: []`. Харнесс такую
+ * службу не отдаёт: в консоли появилось
+ * `Error: cannot get property "connection" without inject`, плагин не поднялся целиком,
+ * и вместе с кнопкой пропало чтение вслух. Отсюда правило: службу читаешь — объяви.
+ * Необязательной формы объявления в этой версии cordis нет, поэтому связь объявлена
+ * требуемой; в запуске без панели мод просто не активируется, и это ожидаемо.
+ */
+export const inject = ['connection']
 
 /** Defaults; the machine-specific paths belong in the profile's loader row. */
 export const DEFAULTS = {

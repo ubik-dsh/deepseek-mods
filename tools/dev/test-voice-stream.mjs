@@ -59,6 +59,16 @@ async function main() {
     module.name === 'voice-stream' && Array.isArray(module.inject) && typeof module.apply === 'function',
     `name=${module.name}`)
 
+  // ЛОВУШКА, СТОИВШАЯ ПРОСТОЯ. Харнесс не отдаёт службу, которую плагин не объявил:
+  // чтение `ctx.connection` без объявления бросает «cannot get property "connection"
+  // without inject», плагин не поднимается целиком, и вместе с кнопкой пропадает
+  // чтение вслух. Проверяем не поведение, а само правило: читаешь — объяви.
+  const source = readFileSync(join(PACKAGE, 'lib', 'index.js'), 'utf8')
+  const readsConnection = /ctx\.connection/u.test(source)
+  check('служба связи объявлена, раз код её читает',
+    !readsConnection || module.inject.includes('connection'),
+    `inject=${JSON.stringify(module.inject)}, чтение ctx.connection: ${readsConnection}`)
+
   let refused = null
   try {
     module.validateConfig({})

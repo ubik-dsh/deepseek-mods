@@ -51,8 +51,10 @@ The only control is one button in the session header's utilities row: it shows w
 answers are read aloud and switches that with a click. It writes the same switch file the
 voice process reads (`_voice\ГОЛОС.txt`), so the panel, the lamp and the voice itself always
 agree. The route is `/api/voice-stream.mod`; the browser half uses nothing but baseline
-modules and asks for the `slots` service. With no `connection` service mounted (a headless
-run) the reading still works and only the button is absent.
+modules and asks for the `slots` service. The host half **injects `connection`**, because the
+harness refuses to hand a plugin a service it never declared: reading `ctx.connection` without
+it throws `cannot get property "connection" without inject` and takes the whole plugin down,
+the reading included. A headless run therefore does not activate this mod.
 
 ## Configuration
 
