@@ -169,6 +169,46 @@ export class VoiceStream {
     this.fillersPlayed = 0
     this.lastSpokenAt = 0
     this.lastFillerAt = 0
+    /**
+     * Текст последнего ответа, собранный из живого потока.
+     *
+     * Зачем он нужен. Оператор отошёл, ответ прозвучал без него, и повторить чтение было
+     * нечем: чтец отдаёт куски голосу и тут же про них забывает. Теперь весь текст хода
+     * копится, а на закрытии запоминается последним ответом, который можно прочитать заново.
+     */
+    this.collected = ''
+    this.lastAnswer = ''
+  }
+
+  /** Запомнить кусок ответа для возможного повтора. */
+  collect(text) {
+    if (typeof text === 'string' && text !== '') this.collected += text
+  }
+
+  /** Ход закрылся: собранное становится «последним ответом». */
+  finishTurn() {
+    if (this.collected.trim() !== '') this.lastAnswer = this.collected
+    this.collected = ''
+  }
+
+  /** Есть ли что повторять. */
+  get hasLast() {
+    return this.lastAnswer.trim() !== ''
+  }
+
+  /**
+   * Прочитать последний ответ заново.
+   *
+   * Идём ТЕМ ЖЕ путём, что и вживую: `begin`, потом по куску, потом остаток. Поэтому повтор
+   * звучит так же, как звучал ответ, и не заводит второго способа нарезки, который однажды
+   * разойдётся с первым.
+   */
+  repeat() {
+    if (!this.hasLast) return { ok: false, error: 'повторять нечего: в этой сессии ответа ещё не было' }
+    this.begin()
+    this.feed(this.lastAnswer)
+    this.flush()
+    return { ok: true, chars: this.lastAnswer.length }
   }
 
   start() {
@@ -291,12 +331,13 @@ export class VoiceStream {
     this.say(text)
   }
 
-  /** Начался новый ход: считаем подводки заново. */
+  /** Начался новый ход: считаем подводки заново, копилку текста чистим. */
   startTurn(turn) {
     this.turn = turn
     this.fillersPlayed = 0
     this.lastSpokenAt = Date.now()
     this.lastFillerAt = 0
+    this.collected = ''
   }
 
   /**
@@ -423,6 +464,7 @@ export function apply(ctx, rawConfig) {
       // Читаем ровно видимый ответ: размышления и вызовы инструментов вслух не нужны.
       if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') {
         voice.feed(chunk.text)
+        voice.collect(chunk.text)
         voice.lastSpokenAt = Date.now()
         return
       }
@@ -443,6 +485,9 @@ export function apply(ctx, rawConfig) {
     }
     if (frame.type === 'end') {
       voice.flush()
+      // Ход закрылся: то, что собрано из потока, становится последним ответом и его можно
+      // прочитать заново кнопкой (оператор отошёл, а ответ прозвучал без него).
+      voice.finishTurn()
       toolArguments = ''
     }
   }, { global: true })
@@ -469,21 +514,38 @@ export function apply(ctx, rawConfig) {
       methods: ['GET', 'POST'],
       requestBody: 'buffered',
       fetch: async (request) => {
-        if (request.method === 'GET') return json({ on: readVoiceOn(statePath), statePath })
+        /** Снимок для кнопок: состояние голоса и есть ли что повторять. */
+        const snapshot = () => ({
+          on: readVoiceOn(statePath),
+          hasLast: voice.hasLast,
+          lastChars: voice.lastAnswer.length,
+          statePath,
+        })
+        if (request.method === 'GET') return json(snapshot())
         let payload = null
         try {
           payload = await request.json()
         } catch {
           return json({ ok: false, error: 'тело запроса должно быть JSON' }, 400)
         }
-        if (typeof payload?.on !== 'boolean') return json({ ok: false, error: 'нужно поле on: true или false' }, 400)
+        // ПОВТОР ЧТЕНИЯ. Оператор отошёл, ответ прозвучал без него; теперь его можно
+        // прочитать заново тем же путём, каким он читался вживую.
+        if (payload?.repeat === true) {
+          const outcome = voice.repeat()
+          if (!outcome.ok) return json({ ...snapshot(), ok: false, error: outcome.error }, 409)
+          ctx.logger?.info?.(`voice-stream: повторяю последний ответ (${outcome.chars} знаков)`)
+          return json({ ...snapshot(), ok: true, chars: outcome.chars })
+        }
+        if (typeof payload?.on !== 'boolean') {
+          return json({ ok: false, error: 'нужно поле on: true или false, либо repeat: true' }, 400)
+        }
         try {
           writeVoiceOn(statePath, payload.on)
         } catch (error) {
           return json({ ok: false, error: `переключатель не записался: ${messageOf(error)}` }, 500)
         }
         ctx.logger?.info?.(`voice-stream: голос ${payload.on ? 'включён' : 'выключен'} кнопкой в панели`)
-        return json({ on: readVoiceOn(statePath), statePath })
+        return json(snapshot())
       },
     })
   } else {

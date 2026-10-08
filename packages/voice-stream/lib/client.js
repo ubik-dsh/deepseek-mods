@@ -87,13 +87,19 @@ window.__ModuleLoader__.load({
 		};
 
 		/**
-		 * Кнопка голоса: показывает состояние и переключает его.
-		 * @returns кнопка для строки служебных действий.
+		 * Две кнопки: включить или выключить голос, и прочитать последний ответ заново.
+		 *
+		 * Вторая нужна потому, что ответ можно пропустить: оператор отошёл, вернулся, а читать
+		 * уже нечего. Хост держит текст последнего ответа, поэтому повтор идёт тем же путём,
+		 * каким ответ читался вживую.
+		 *
+		 * @returns кнопки для строки служебных действий.
 		 */
 		function VoiceButton() {
 			const [state, setState] = react.useState(null);
 			const [busy, setBusy] = react.useState(false);
 			const [error, setError] = react.useState(null);
+			const [notice, setNotice] = react.useState(null);
 
 			react.useEffect(() => {
 				let alive = true;
@@ -120,13 +126,34 @@ window.__ModuleLoader__.load({
 				).finally(() => setBusy(false));
 			};
 
+			/** Прочитать последний ответ заново. */
+			const repeat = () => {
+				if (state === null || busy) return;
+				setBusy(true);
+				setError(null);
+				setNotice(null);
+				callHost("POST", { repeat: true }).then(
+					(snapshot) => {
+						setState(snapshot);
+						setNotice(snapshot.chars === undefined
+							? "читаю заново"
+							: `читаю заново: ${Math.round(snapshot.chars / 16)} с речи`);
+					},
+					(failure) => setError(messageOf(failure)),
+				).finally(() => setBusy(false));
+			};
+
 			const on = state === null ? null : state.on === true;
+			const canRepeat = state !== null && state.hasLast === true;
 			const label = on === null ? "Голос…" : on ? "Голос: вкл" : "Голос: выкл";
 			const title = on === null
 				? "Состояние голоса не прочитано"
 				: on
 					? "Ответы читаются вслух. Нажми, чтобы выключить звук."
 					: "Ответы читаются только глазами. Нажми, чтобы включить звук.";
+			const repeatTitle = canRepeat
+				? `Прочитать последний ответ заново (${state.lastChars} знаков)`
+				: "Повторять нечего: в этой сессии ответа ещё не было";
 
 			return react.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: "6px" } },
 				react.createElement("button", {
@@ -138,6 +165,15 @@ window.__ModuleLoader__.load({
 					"aria-label": title,
 					style: on === false ? { ...styles.button, ...styles.off } : styles.button,
 				}, react.createElement("span", { style: styles.dot }), label),
+				react.createElement("button", {
+					type: "button",
+					onClick: repeat,
+					disabled: busy || !canRepeat,
+					title: repeatTitle,
+					"aria-label": repeatTitle,
+					style: canRepeat ? styles.button : { ...styles.button, ...styles.off },
+				}, "Повторить"),
+				notice === null ? null : react.createElement("span", { style: styles.error }, notice),
 				error === null ? null : react.createElement("span", { style: styles.error, title: error }, "нет связи"),
 			);
 		}

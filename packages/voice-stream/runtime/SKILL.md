@@ -41,10 +41,13 @@ Four parts, in the order they run:
    sentence.
 
 4. **Control and announce.** Expose one mute control that writes a state file the voice process
-   reads, so a GUI, a tray tool and the voice itself cannot disagree. Pre-synthesize a handful of
-   short filler phrases at process start and play one when a turn begins or when work drags on:
-   silence while tools run reads as "not heard" to a human. When a tool call carries an explicit
-   pause, say the pause before it starts, in words, in the listener's language.
+   reads, so a GUI, a tray tool and the voice itself cannot disagree. Keep the text of the last
+   answer, and offer a second control that reads it again: an answer is often generated while the
+   listener is away, and a reader that forgets each piece as it speaks it leaves nothing to repeat.
+   Re-read through the same path the live reading takes, so a repeat cannot drift from the original.
+   Pre-synthesize a handful of short filler phrases at process start and play one when a turn begins
+   or when work drags on: silence while tools run reads as "not heard" to a human. When a tool call
+   carries an explicit pause, say the pause before it starts, in words, in the listener's language.
 
 ## What to replace
 

@@ -70,9 +70,14 @@ a lie.
 
 ### The button in the panel
 
-The only control is one button in the session header's utilities row: it shows whether
-answers are read aloud and switches that with a click. It writes the same switch file the
-voice process reads (`runtime\ГОЛОС.txt` (next to the configured `say_stream.py`)), so the panel, the lamp and the voice itself always
+The only controls are two buttons in the session header's utilities row. The first shows whether
+answers are read aloud and switches that with a click. The second, **"Повторить"** (read again),
+speaks the **last answer** once more: it exists for the case where the answer played while nobody was
+listening and there is no other way to hear it again. The host keeps the last answer's text,
+collected from the live stream, so the repeat takes exactly the path the live reading took; when
+there is nothing to repeat the button is disabled and says so in its tooltip. The first button writes
+the same switch file the
+voice process reads (`runtime\ГОЛОС.txt`, next to the configured `say_stream.py`), so the panel, the lamp and the voice itself always
 agree. The route is `/api/voice-stream.mod`; the browser half uses nothing but baseline
 modules and asks for the `slots` service. The host half **injects `connection`**, because the
 harness refuses to hand a plugin a service it never declared: reading `ctx.connection` without
