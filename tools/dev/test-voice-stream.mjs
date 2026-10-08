@@ -33,21 +33,23 @@ const check = (title, passed, detail) => {
   console.log(`${passed ? 'ПРОШЛО' : 'ПРОВАЛ'}  ${title}${detail === undefined ? '' : `\n        ${detail}`}`)
 }
 
-/** Read the deployed loader row, so the test checks what actually runs. */
+/**
+ * Read the deployed loader row, so the test checks what actually runs.
+ *
+ * No fallback paths here on purpose: this file is published, and a fallback is a machine-specific
+ * path, which is exactly what a published file must not carry. Not deployed means "not configured
+ * here", and the informational line says so instead of inventing a path that may not exist.
+ */
 function deployedConfig() {
   const patch = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'profiles', 'web', 'cordis.patch.yml')
-  const fallback = {
-    pythonPath: 'C:\\Users\\admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
-    streamPath: 'C:\\Users\\admin\\Documents\\ds1\\_voice\\say_stream.py',
-  }
   try {
     const text = readFileSync(patch, 'utf8')
     const block = text.slice(text.indexOf('id: voice-stream'))
     const python = /pythonPath:\s*'([^']+)'/u.exec(block)
     const stream = /streamPath:\s*'([^']+)'/u.exec(block)
-    return { pythonPath: python?.[1] ?? fallback.pythonPath, streamPath: stream?.[1] ?? fallback.streamPath }
+    return { pythonPath: python?.[1] ?? null, streamPath: stream?.[1] ?? null }
   } catch {
-    return fallback
+    return { pythonPath: null, streamPath: null }
   }
 }
 
@@ -264,7 +266,9 @@ async function main() {
     JSON.stringify({ name: registered?.name, id: registered?.id }))
 
   const deployed = deployedConfig()
-  console.log(`\nразвёрнутые пути: ${deployed.pythonPath}\n                  ${deployed.streamPath}`)
+  console.log(deployed.pythonPath === null
+    ? '\nразвёрнутая строка загрузчика не найдена: этот тест проверяет мод, а не ваши пути'
+    : `\nразвёрнутые пути: ${deployed.pythonPath}\n                  ${deployed.streamPath}`)
   rmSync(directory, { recursive: true, force: true })
 
   const failed = results.filter((entry) => !entry.passed)

@@ -46,7 +46,7 @@ and reads the answer as it arrives.
   sentence goes to the voice process immediately. A run-on sentence is cut at a comma once it
   reaches `chunkChars`, so a piece never grows into a paragraph.
 - On `end` the tail is flushed, so nothing is lost — the mistake the first reader made twice.
-- Pieces are handed to `_voice\say_stream.py`, which keeps the voice model warm and
+- Pieces are handed to `runtime\say_stream.py`, which keeps the voice model warm and
   synthesizes the next piece while the current one is playing. The voice therefore does not
   fall behind the typing.
 - Subagents are skipped: their sessions carry `delegationDepth > 0`, and reading their chatter
@@ -56,7 +56,7 @@ and reads the answer as it arrives.
 
 Wait time is covered the way the big voice assistants do it, and the operator asked for it:
 short phrases spoken from a **pre-synthesized cache**, so the first sound costs nothing at
-all. `_voice\say_stream.py` synthesizes the list once at startup into `_voice\voices\fillers\`
+all. `runtime\say_stream.py` synthesizes the list once at startup into `runtime\voices\fillers\`
 and then only plays those files back; a phrase goes out at the start of every turn, and
 further ones when work drags on (`workAfterMs`, at most `maxFillersPerTurn` per turn, no
 oftener than `workRepeatMs`).
@@ -72,7 +72,7 @@ a lie.
 
 The only control is one button in the session header's utilities row: it shows whether
 answers are read aloud and switches that with a click. It writes the same switch file the
-voice process reads (`_voice\ГОЛОС.txt`), so the panel, the lamp and the voice itself always
+voice process reads (`runtime\ГОЛОС.txt` (next to the configured `say_stream.py`)), so the panel, the lamp and the voice itself always
 agree. The route is `/api/voice-stream.mod`; the browser half uses nothing but baseline
 modules and asks for the `slots` service. The host half **injects `connection`**, because the
 harness refuses to hand a plugin a service it never declared: reading `ctx.connection` without
@@ -89,13 +89,13 @@ One loader row in `~/.dsh/profiles/web/cordis.patch.yml`:
       name: '@local/dsh-voice-stream'
       config:
         pythonPath: 'C:\...\Python312\python.exe'
-        streamPath: 'C:\...\_voice\say_stream.py'
+        streamPath: 'C:\Users\<you>\.dsh\profiles\node_modules\@local\dsh-voice-stream\runtime\say_stream.py'
 ```
 
 | key | default | meaning |
 |---|---|---|
 | `pythonPath` | none, **required** | interpreter with torch and the voice model |
-| `streamPath` | none, **required** | `_voice\say_stream.py`, the warm voice process |
+| `streamPath` | none, **required** | `runtime\say_stream.py` inside the installed package |
 | `firstChunk` | `50` | characters to wait for before the first spoken piece |
 | `chunkChars` | `260` | piece size after which a run-on sentence is cut |
 | `maxChars` | `6000` | how much of one answer is read at all |
@@ -116,5 +116,5 @@ node tools/dev/test-voice-stream.mjs            # piece cutting, hook wiring, re
 Then reload the Web GUI (F5). This is a **new** mod, so `dsh web` must be restarted once
 before it is loaded; a row for a newly installed package is not picked up by a running host.
 
-Turning the voice off is the same switch as before: `_voice\ГОЛОС.txt` set to `ВЫКЛ` silences
-the reader without stopping it, and `_voice\say_stream.py` reads that file itself.
+Turning the voice off is the same switch as before: `runtime\ГОЛОС.txt` (next to the configured `say_stream.py`) set to `ВЫКЛ` silences
+the reader without stopping it, and `runtime\say_stream.py` reads that file itself.

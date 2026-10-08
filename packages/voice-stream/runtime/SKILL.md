@@ -105,10 +105,29 @@ Each one was hit, diagnosed and fixed here. They are listed in the order they co
 12. **The listener is the only available ear.** There is no way for an agent to hear its own
     output. Build a variant runner that speaks the candidate pronunciations numbered, and ask the
     human which number was right; record the choice, and record that it is a choice.
+13. **Two documents in one package drifted apart.** The README's configuration example pointed at
+    the developer's working folder (`_voice/say_stream.py`) while the install guide pointed at the
+    installed package. Both looked authoritative, and the plugin's own validation rejects a path
+    that does not exist, so the wrong one fails activation with an error that mentions nothing about
+    documentation. Fix: one canonical path, stated in the install guide and linked from the README;
+    when the layout changes, search the package for the old layout rather than updating one file.
+14. **The installer replaces the package directory.** A reinstall deleted the downloaded voice
+    model and the user's pronunciation dictionary, because both lived inside the package. Nothing
+    warned about it. Fix: let user data live outside the package (an environment variable for the
+    model and for the dictionary keeps the default working), and say in the install guide exactly
+    what an update replaces.
+15. **A fresh reader is the cheapest documentation test.** Handing the published documents to an
+    agent that has never seen the project produced sixteen defects in one pass: an unreachable
+    host claimed as working, a `pip install` not bound to the interpreter in the configuration, a
+    status command reporting a model the active engine does not use, a duplicate row the installer
+    itself had already written. None of them were visible to the author, who knew what the text
+    meant. Do this before publishing, not after.
 
 ## How to verify
 
-Verification is by measurement, not by reading code.
+Verification is by measurement, not by reading code. Two of the checks below are cheap and catch
+whole classes of trouble: the property test, and handing the documents to a reader who has never
+seen the project.
 
 ```bash
 python runtime/сказать.py          # speaks numbers, foreign words and a file name

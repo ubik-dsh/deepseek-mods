@@ -17,12 +17,16 @@
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ALIAS_FILE = HERE / "алиасы-речи.txt"
+# Словарь произношения можно держать вне пакета: установщик заменяет каталог пакета целиком,
+# и правки в алиасы-речи.txt при обновлении пропадут. Переменная DSH_VOICE_ALIASES это лечит.
+_ALIASES_FROM_ENV = os.environ.get("DSH_VOICE_ALIASES")
+ALIAS_FILE = Path(_ALIASES_FROM_ENV) if _ALIASES_FROM_ENV else HERE / "алиасы-речи.txt"
 
 UNITS = ["ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
 UNITS_FEMALE = ["ноль", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]

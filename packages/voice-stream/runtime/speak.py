@@ -27,6 +27,7 @@ Piper — нейросетевой синтез, русские голоса е�
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import wave
@@ -38,7 +39,11 @@ if sys.stdout is not None:
 
 HERE = Path(__file__).resolve().parent
 ENGINE = "silero"                      # silero | piper — выбран оператором после прослушивания
-SILERO_MODEL = HERE / "voices" / "silero" / "v3_ru.pt"
+# ПУТЬ К МОДЕЛИ МОЖНО ВЫНЕСТИ ЗА ПРЕДЕЛЫ ПАКЕТА. Установщик мода заменяет каталог пакета
+# целиком, поэтому скачанная модель голоса и правки словаря при обновлении пропадут. Если
+# задать переменную DSH_VOICE_MODEL, файл живёт в своём месте и переживает любую переустановку.
+_MODEL_FROM_ENV = os.environ.get("DSH_VOICE_MODEL")
+SILERO_MODEL = Path(_MODEL_FROM_ENV) if _MODEL_FROM_ENV else HERE / "voices" / "silero" / "v3_ru.pt"
 SILERO_SPEAKER = "xenia"               # выбран из шести: aidar baya kseniya xenia eugene random
 SILERO_RATE = 1.10                     # +10% — оператор слушал 10 и 21, оставил 10
 VOICE = HERE / "voices" / "ru_RU-irina-medium.onnx"   # голос Piper, если ENGINE вернут на piper
@@ -196,8 +201,15 @@ def main() -> int:
         print("  голос ВЫКЛЮЧЕН — читай глазами")
         return 0
     if args.status:
+        # Показываем модель ДЕЙСТВУЮЩЕГО движка, а не того, который выключен: раньше здесь
+        # всегда печатался размер модели Piper, и при работающем Silero выходило «НЕТ».
+        active = SILERO_MODEL if ENGINE == "silero" else VOICE
+        engine_name = "Silero" if ENGINE == "silero" else "Piper"
         print(f"  голос: {'ВКЛ' if voice_on() else 'ВЫКЛ'}   (файл {STATE.name})")
-        print(f"  голос-модель: {'есть ' + str(round(VOICE.stat().st_size/1024/1024,1)) + ' МБ' if VOICE.exists() else 'НЕТ'}")
+        print(f"  движок: {engine_name}")
+        print(f"  модель {engine_name}: "
+              + (f"есть {round(active.stat().st_size / 1024 / 1024, 1)} МБ ({active})"
+                 if active.exists() else f"НЕТ, жду файл {active}"))
         return 0
 
     text = args.file.read_text(encoding="utf-8") if args.file else " ".join(args.text)
