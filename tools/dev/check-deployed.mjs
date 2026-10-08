@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url'
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const PACKAGES = join(REPO, 'packages')
 const HOME = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+const PROFILE = process.env.DSH_PROFILE ?? 'web'
 const INSTALLED = join(HOME, 'profiles', 'node_modules', '@local')
 
 /** Files that belong to a build rather than to the source. */
@@ -73,9 +74,25 @@ console.log(`  Harness home: ${HOME}`)
 console.log('')
 
 let problems = 0
+// Пакет, объявленный в зависимостях профиля, стоит как плагин-bundle: им управляет pnpm, и работает
+// он ССЫЛКОЙ на этот репозиторий, а не копией в общей папке. Сравнивать его копию бессмысленно:
+// правка в репозитории уже действует, а установщик её не переносит (и правильно). Скажем об этом
+// словами, чтобы честный ответ не читался как расхождение.
+const pnpmManaged = (() => {
+  try {
+    const profile = JSON.parse(readFileSync(join(HOME, 'profiles', PROFILE, 'package.json'), 'utf8'))
+    return new Set(Object.keys(profile?.dependencies ?? {}))
+  } catch {
+    return new Set()
+  }
+})()
 for (const folder of packages) {
   const source = join(PACKAGES, folder)
   const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+  if (pnpmManaged.has(manifest.name)) {
+    console.log(`  plugin    ${manifest.name}  (installed as a profile bundle: pnpm resolves it from this repository)`)
+    continue
+  }
   // The loader resolves the row's `name` to a directory of that same name, so the
   // deployment lands in the last segment of the package's own name.
   const deployed = join(INSTALLED, String(manifest.name).split('/').pop())

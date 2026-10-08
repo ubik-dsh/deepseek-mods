@@ -50,6 +50,7 @@ const MESSAGES = {
     installed: (name, path) => `installed ${name} -> ${path}`,
     preserved: (name, paths) => `kept ${name}: user data survives the update (${paths})`,
     rowFromBundle: (name) => `${name} is a plugin bundle: its loader row comes from its own layer`,
+    managedAsBundle: (name) => `${name} is installed as a plugin bundle (pnpm manages it): left alone`,
     unchanged: (name) => `${name} is already up to date`,
     skipped: (name) => `SKIPPED ${name}: no package.json`,
     backupState: (path) => `backed up ${path}`,
@@ -73,6 +74,7 @@ const MESSAGES = {
     installed: (name, path) => `установлен ${name} -> ${path}`,
     preserved: (name, paths) => `сохранены данные пользователя в ${name}: ${paths}`,
     rowFromBundle: (name) => `${name} это плагин-bundle: строку загрузчика приносит его собственный слой`,
+    managedAsBundle: (name) => `${name} стоит как плагин-bundle, им управляет pnpm: не трогаю`,
     unchanged: (name) => `${name} уже актуален`,
     skipped: (name) => `ПРОПУЩЕН ${name}: нет package.json`,
     backupState: (path) => `сохранён в бэкап: ${path}`,
@@ -343,10 +345,26 @@ function restoreUserData(destination, parked, shipped) {
 }
 
 if (!DRY_RUN) mkdirSync(target, { recursive: true })
+// ПАКЕТ, КОТОРЫМ УПРАВЛЯЕТ pnpm, УСТАНОВЩИК НЕ ТРОГАЕТ. Если пакет объявлен в зависимостях профиля,
+// он стоит как плагин-bundle: pnpm держит его ссылкой, а строку загрузчика приносит его собственный
+// слой. Копия поверх ссылки сломала бы эту связь, и два установщика начали бы спорить за один
+// каталог. Поэтому такие пакеты пропускаем и говорим об этом вслух.
+const profileManifest = (() => {
+  try {
+    return JSON.parse(readFileSync(join(home, 'profiles', PROFILE, 'package.json'), 'utf8'))
+  } catch {
+    return null
+  }
+})()
+const managedByPnpm = new Set(Object.keys(profileManifest?.dependencies ?? {}))
 for (const entry of packages) {
   const source = join(PACKAGES_DIR, entry.directory)
   if (!existsSync(join(source, 'package.json'))) {
     say(t.skipped(entry.package))
+    continue
+  }
+  if (managedByPnpm.has(entry.package)) {
+    say(t.managedAsBundle(entry.package))
     continue
   }
   const destination = join(target, entry.destination)
