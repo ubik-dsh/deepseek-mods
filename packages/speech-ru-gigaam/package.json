@@ -1,0 +1,27 @@
+{
+  "name": "@local/dsh-speech-ru-gigaam",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH plugin: a second speech recognizer for the Voice Input bundle — Russian through GigaAM-v3 in a warm local Python process, so the microphone button stops forcing Russian into SenseVoice's five languages",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./worker.py": "./lib/worker.py",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/worker.py",
+    "lib/pyannote-stub/pyannote/__init__.py",
+    "lib/pyannote-stub/pyannote/audio/__init__.py",
+    "lib/pyannote-stub/pyannote/audio/pipelines/__init__.py",
+    "README.md",
+    "README.ru.md"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-experimental-speech-to-text": "*"
+  }
+}
