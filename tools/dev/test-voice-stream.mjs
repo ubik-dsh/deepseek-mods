@@ -241,6 +241,58 @@ async function main() {
   }))
   check('мусор в теле отвергается, а не пишется в переключатель',
     badReply.status === 400, `HTTP ${badReply.status}`)
+
+  // --- 4б. повтор чтения последнего ответа ------------------------------------
+  // Оператор отошёл, ответ прозвучал без него. Кнопка «Повторить» должна прочитать его
+  // заново. Голос для этой проверки тот же подставной, что и выше, поэтому видно, что
+  // именно ушло в процесс.
+  const emptyRepeat = await route.fetch(new Request('http://local/api/voice-stream.mod', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repeat: true }),
+  }))
+  check('повтор без ответа отвечает отказом, а не молчанием',
+    emptyRepeat.status === 409 && (await emptyRepeat.json()).ok === false, `HTTP ${emptyRepeat.status}`)
+
+  let repeatHook = null
+  let repeatRoute = null
+  const repeatCtx = {
+    on: (eventName, listener) => {
+      if (eventName === 'agent/assistant-stream') repeatHook = listener
+    },
+    effect: () => {},
+    logger: { debug: () => {}, info: () => {} },
+    connection: { fetch: { register: (definition) => { repeatRoute = definition; return () => {} } } },
+  }
+  module.apply(repeatCtx, {
+    pythonPath: process.execPath, streamPath: fakeVoice, firstChunk: 20, chunkChars: 60, fillers: false,
+  })
+  const answerFrames = [
+    { type: 'start', turn: 7 },
+    { type: 'chunk', chunk: { type: 'text-delta', text: 'Первый ответ целиком. ' } },
+    { type: 'chunk', chunk: { type: 'text-delta', text: 'Его надо уметь повторить.' } },
+    { type: 'end' },
+  ]
+  for (const frame of answerFrames) repeatHook({ agent, frame })
+  await new Promise((resolve) => setTimeout(resolve, 600))
+
+  const linesBefore = readFileSync(received, 'utf8').split('\n').filter((line) => line.trim() !== '')
+  const afterTurn = await (await repeatRoute.fetch(new Request('http://local/api/voice-stream.mod'))).json()
+  check('после хода есть что повторять',
+    afterTurn.hasLast === true && afterTurn.lastChars > 0, JSON.stringify(afterTurn))
+
+  const repeatReply = await repeatRoute.fetch(new Request('http://local/api/voice-stream.mod', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repeat: true }),
+  }))
+  const repeatBody = await repeatReply.json()
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  const linesAfter = readFileSync(received, 'utf8').split('\n').filter((line) => line.trim() !== '')
+  const repeated = linesAfter.slice(linesBefore.length)
+    .map((line) => JSON.parse(line)).filter((record) => record.text).map((record) => record.text)
+  check('повтор читает тот же текст заново',
+    repeatBody.ok === true && repeated.join(' ').includes('Первый ответ целиком'),
+    `ok=${repeatBody.ok}, знаков ${repeatBody.chars}, куски: ${JSON.stringify(repeated)}`)
+  check('повтор начинается с метки нового ответа, как живое чтение',
+    linesAfter.slice(linesBefore.length).map((line) => JSON.parse(line)).some((record) => record.command === 'begin'),
+    JSON.stringify(linesAfter.slice(linesBefore.length).map((line) => line.trim()).slice(0, 3)))
   rmSync(stateDir, { recursive: true, force: true })
 
   // --- 5. браузерная половина --------------------------------------------------
@@ -264,6 +316,20 @@ async function main() {
   check('кнопка встаёт в строку служебных действий шапки сеанса',
     registered?.name === 'conversation.session.header.utilities' && registered?.id === 'voice-stream',
     JSON.stringify({ name: registered?.name, id: registered?.id }))
+
+  const clientSource = readFileSync(join(PACKAGE, 'lib', 'client.js'), 'utf8')
+  check('в браузерной половине есть кнопка повтора и запрос на повтор',
+    clientSource.includes('Повторить') && clientSource.includes('repeat: true'),
+    `Повторить: ${clientSource.includes('Повторить')}, repeat: true: ${clientSource.includes('repeat: true')}`)
+
+  // ЛОВУШКА, НА КОТОРУЮ НАСТУПИЛ ОПЕРАТОР. Страница подтягивает новую браузерную половину
+  // сразу, а хост обновляется только перезапуском. Кнопка при этом видна и мертва, и это
+  // выглядит как поломка. Проверяем, что мёртвая кнопка называет причину: без этого
+  // «не активна» снова будет загадкой. Проверка читает исходник, а не рисует компонент:
+  // рисование требует настоящего React, и подделка здесь проверяла бы подделку.
+  check('кнопка повтора объясняет старую сборку хоста, а не молчит',
+    clientSource.includes('staleHost') && clientSource.includes('нужен перезапуск dsh web'),
+    `staleHost: ${clientSource.includes('staleHost')}, подсказка: ${clientSource.includes('нужен перезапуск dsh web')}`)
 
   const deployed = deployedConfig()
   console.log(deployed.pythonPath === null

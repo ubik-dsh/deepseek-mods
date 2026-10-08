@@ -145,15 +145,25 @@ window.__ModuleLoader__.load({
 
 			const on = state === null ? null : state.on === true;
 			const canRepeat = state !== null && state.hasLast === true;
+			/**
+			 * ХОСТ СТАРОЙ СБОРКИ. Страница подтягивает новую браузерную половину сразу, а хост
+			 * живёт в запущенном процессе и обновляется только перезапуском. Тогда кнопка
+			 * видна, но повторять ей нечем: в ответе хоста нет поля `hasLast`. Оператор это уже
+			 * видел («вижу кнопку, но она не активна»), поэтому мёртвая кнопка теперь говорит
+			 * причину словами, а не молчит.
+			 */
+			const staleHost = state !== null && state.hasLast === undefined;
 			const label = on === null ? "Голос…" : on ? "Голос: вкл" : "Голос: выкл";
 			const title = on === null
 				? "Состояние голоса не прочитано"
 				: on
 					? "Ответы читаются вслух. Нажми, чтобы выключить звук."
 					: "Ответы читаются только глазами. Нажми, чтобы включить звук.";
-			const repeatTitle = canRepeat
-				? `Прочитать последний ответ заново (${state.lastChars} знаков)`
-				: "Повторять нечего: в этой сессии ответа ещё не было";
+			const repeatTitle = staleHost
+				? "Хост в памяти старой сборки: перезапусти dsh web, иначе повторять нечем"
+				: canRepeat
+					? `Прочитать последний ответ заново (${state.lastChars} знаков)`
+					: "Повторять нечего: в этой сессии ответа ещё не было";
 
 			return react.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: "6px" } },
 				react.createElement("button", {
@@ -173,6 +183,9 @@ window.__ModuleLoader__.load({
 					"aria-label": repeatTitle,
 					style: canRepeat ? styles.button : { ...styles.button, ...styles.off },
 				}, "Повторить"),
+				staleHost
+					? react.createElement("span", { style: styles.error, title: repeatTitle }, "нужен перезапуск dsh web")
+					: null,
 				notice === null ? null : react.createElement("span", { style: styles.error }, notice),
 				error === null ? null : react.createElement("span", { style: styles.error, title: error }, "нет связи"),
 			);
