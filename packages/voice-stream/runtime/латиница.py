@@ -147,6 +147,12 @@ def convert_token(token: str, aliases: list[tuple[str, str]], engine) -> str:
     if "\\" in token or "/" in token:
         pieces = [piece for piece in SEPARATORS.split(token) if piece not in ("", ".")]
         return " ".join(convert_token(piece, aliases, engine) for piece in pieces)
+    # ИМЯ С ДВУМЯ И БОЛЬШЕ ТОЧКАМИ это один токен, а не три предложения. Раньше такой токен
+    # уходил в фонетику целиком, и `dsh.bundle.patch` звучало как «дш. Бэндэл. Пэч»: точки
+    # становились паузами и заглавными буквами, а слушатель слышал три обрубка. Теперь каждый
+    # отрезок читается отдельно, а точки не произносятся вовсе.
+    if token.count(".") >= 2 and all(part.isalnum() for part in token.split(".")):
+        return " ".join(convert_part(part, aliases, engine) for part in token.split("."))
     # Имя с расширением: `dsh_voice.mjs` — имя отдельно, расширение отдельно.
     if re.fullmatch(r"[\w-]+\.[A-Za-z0-9]+", token):
         name, extension = token.rsplit(".", 1)

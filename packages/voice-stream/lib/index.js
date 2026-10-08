@@ -135,6 +135,12 @@ export function waitFromArguments(text) {
  * по его длине — и в следующий кусок попадал лишний знак: «. Хвост без точки». Поэтому
  * здесь рядом с текстом идёт `consumed`: сколько знаков исходника этот кусок занял.
  *
+ * ТОЧКА ВНУТРИ ИМЕНИ ЭТО НЕ КОНЕЦ ПРЕДЛОЖЕНИЯ. Оператор услышал, как фраза
+ * «…объявляет dsh.bundle.patch, и его слои…» распалась на «…объявляет ди эс эйч бэндэл»
+ * и «пэч, и его слои…»: рез шёл по точке внутри имени, и половинки читались порознь
+ * огрызками. Поэтому концом предложения считается только знак, за которым стоит пробел
+ * или конец текста: у `dsh.bundle.patch` точки окружены буквами, и он не режется.
+ *
  * @param text - накопленный, ещё не прочитанный текст.
  * @param options - `min` знаков до первого чтения, `limit` знаков до принудительного реза.
  * @returns кусок и его длину в исходнике, либо null, если читать ещё рано.
@@ -143,9 +149,11 @@ export function takePiece(text, { min, limit }) {
   if (text.length < min) return null
   const window = text.slice(0, Math.min(text.length, limit * 2))
   for (let index = min - 1; index < window.length; index += 1) {
-    if ('.!?…'.includes(window[index])) {
-      return { text: text.slice(0, index + 1).trim(), consumed: index + 1 }
-    }
+    if (!'.!?…'.includes(window[index])) continue
+    const next = text[index + 1]
+    // Конец предложения: дальше пробел, конец текста или закрывающая скобка с пробелом.
+    if (next !== undefined && !/[\s)\]»"]/u.test(next)) continue
+    return { text: text.slice(0, index + 1).trim(), consumed: index + 1 }
   }
   if (text.length < limit) return null
   const head = text.slice(0, limit)
@@ -178,6 +186,36 @@ export class VoiceStream {
      */
     this.collected = ''
     this.lastAnswer = ''
+  }
+
+  /**
+   * Отправить запрос голосовому процессу, пережив мёртвую трубу.
+   *
+   * ПОЧЕМУ ЭТО НЕ ОСТОРОЖНОСТЬ, А ОБЯЗАННОСТЬ. Я сам убил голосовой процесс снаружи, чтобы он
+   * взял свежий код, и запись в его вход уронила **весь харнесс**:
+   * `dsh: fatal uncaught exception: Error: write EPIPE at VoiceStream.begin`. Ошибка потока это
+   * не исключение метода, а событие `error`, и без обработчика оно валит процесс. Поэтому:
+   * проверяем, что вход ещё жив, ловим ошибку, забываем процесс (следующая фраза поднимет новый)
+   * и говорим об этом в журнал.
+   *
+   * @param request - то, что уходит голосу строкой JSON.
+   * @returns ушло ли.
+   */
+  send(request) {
+    const child = this.child
+    if (child === null || child.stdin === undefined || child.stdin === null || child.stdin.writable !== true) {
+      this.onLog('voice-stream: голосовой процесс недоступен, подниму новый на следующей фразе')
+      this.child = null
+      return false
+    }
+    try {
+      child.stdin.write(`${JSON.stringify(request)}\n`)
+      return true
+    } catch (error) {
+      this.onLog(`voice-stream: запись голосу не удалась (${messageOf(error)}), подниму новый процесс`)
+      this.child = null
+      return false
+    }
   }
 
   /** Запомнить кусок ответа для возможного повтора. */
@@ -242,18 +280,32 @@ export class VoiceStream {
     child.stderr.on('data', (chunk) => {
       for (const line of String(chunk).split(/\r?\n/u)) if (line.trim() !== '') this.onLog(`voice-stream [голос]: ${line.trim()}`)
     })
+    // ОБОРОТ ВХОДА НЕ ДОЛЖЕН ВАЛИТЬ ХАРНЕСС. Процесс может умереть снаружи (его убивают, он
+    // падает сам), и тогда запись в его вход это событие `error` на потоке. Без обработчика оно
+    // становится фатальным для всего процесса: `dsh: fatal uncaught exception: write EPIPE`.
+    child.stdin.on('error', (error) => {
+      this.onLog(`voice-stream: вход голосового процесса оборвался (${messageOf(error)})`)
+      if (this.child === child) this.child = null
+    })
     child.on('close', (code) => {
-      this.child = null
+      if (this.child === child) this.child = null
       this.onLog(`voice-stream: голосовой процесс закрылся (код ${code})`)
     })
   }
 
-  /** Новый ответ начался: обнулить накопитель и сказать голосу, что это новый ответ. */
+  /**
+   * Новый ответ начался: сказать голосу, что это новый ответ.
+   *
+   * НЕДОГОВОРЁННОЕ НЕ ВЫБРАСЫВАЕМ. Раньше здесь стояло `this.buffer = ''`, и на каждом новом
+   * шаге (а шаг это новая попытка того же хода) накопленный хвост предложения пропадал: если
+   * фраза начиналась в одном шаге и кончалась в другом, середина не звучала вовсе. Оператор
+   * услышал ровно это: «между двумя латиницами теряется текст». Теперь чистится только счётчик
+   * предохранителя, а хвост остаётся и звучит вместе со следующим куском.
+   */
   begin() {
-    this.buffer = ''
     this.spoken = 0
     this.start()
-    this.child?.stdin.write(`${JSON.stringify({ command: 'begin', chunks: 0, chars: 0 })}\n`)
+    this.send({ command: 'begin', chunks: 0, chars: 0 })
   }
 
   /** Пришёл кусок текста от модели. */
@@ -299,7 +351,7 @@ export class VoiceStream {
     this.nextId += 1
     this.spoken += piece.length
     this.onLog(`voice-stream: читаю кусок ${id} (${piece.length} знаков): ${piece.slice(0, 60)}…`)
-    this.child?.stdin.write(`${JSON.stringify({ id, text: piece })}\n`)
+    this.send({ id, text: piece })
   }
 
   /**
@@ -321,7 +373,7 @@ export class VoiceStream {
     this.lastSpokenAt = Date.now()
     this.lastFillerAt = Date.now()
     this.onLog(`voice-stream: подводка ${which} (всего ${this.fillersPlayed} за ход)`)
-    this.child?.stdin.write(`${JSON.stringify({ command: 'filler', id, which })}\n`)
+    this.send({ command: 'filler', id, which })
   }
 
   /** Сказать служебную фразу, которую нужно синтезировать: например про ожидание. */
@@ -364,12 +416,16 @@ export class VoiceStream {
       clearTimeout(this.idle)
       this.idle = null
     }
-    if (this.child === null) return
+    const child = this.child
+    if (child === null) return
     this.onLog(reason)
-    try {
-      this.child.stdin.write(`${JSON.stringify({ command: 'quit' })}\n`)
-    } catch {
-      this.child.kill()
+    // Тоже через `send`: прощание с уже умершим процессом не должно бросать исключение.
+    if (!this.send({ command: 'quit' })) {
+      try {
+        child.kill()
+      } catch {
+        // Процесс уже мёртв, убивать нечего.
+      }
     }
     this.child = null
   }

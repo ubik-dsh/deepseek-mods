@@ -120,11 +120,18 @@ Each one was hit, diagnosed and fixed here. They are listed in the order they co
     model and for the dictionary keeps the default working), and say in the install guide exactly
     what an update replaces.
 15. **A fresh reader is the cheapest documentation test.** Handing the published documents to an
-    agent that has never seen the project produced sixteen defects in one pass: an unreachable
-    host claimed as working, a `pip install` not bound to the interpreter in the configuration, a
-    status command reporting a model the active engine does not use, a duplicate row the installer
-    itself had already written. None of them were visible to the author, who knew what the text
-    meant. Do this before publishing, not after.
+    agent that has never seen the project produced sixteen defects in one pass: an unreachable host
+    claimed as working, a `pip install` not bound to the interpreter in the configuration, a status
+    command reporting a model the active engine does not use, a duplicate row the installer itself
+    had already written. None of them were visible to the author, who knew what the text meant. Do
+    this before publishing, not after.
+16. **A write to a dead child process takes the whole host down.** Killing the voice process while
+    the plugin still held its stdin turned the next write into `EPIPE`, and a stream error is an
+    `error` event rather than a thrown exception: the host died with
+    `fatal uncaught exception: write EPIPE`. Fix: one guarded write helper that checks
+    `stdin.writable`, catches the throw, attaches an `error` listener, and forgets the child so the
+    next phrase spawns a fresh one. Test it by faking a closed, unwritable pipe: the test must prove
+    that the call neither throws nor leaves the plugin believing the voice is alive.
 
 ## How to verify
 

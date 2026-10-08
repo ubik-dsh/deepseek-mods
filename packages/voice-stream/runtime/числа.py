@@ -339,7 +339,16 @@ def prepare(text: str) -> str:
         spoken = normalize_russian_run(prepared) if DATE_LIKE.search(prepared) \
             else normalize_russian_run(expand_units(numbers_to_words(prepared)))
         out.append(lead + spoken + trail)
-    return "".join(out)
+    # СКЛЕЙКА БЕЗ ПОТЕРИ РАЗДЕЛИТЕЛЯ. Латиница и русский приходят разными кусками, и раньше они
+    # сшивались вплотную: «плагин» и «bundle» давали на слух одно слово «плагинбэндэл». Если на
+    # стыке нет ни пробела, ни знака, ставим пробел; лишние пробелы сжимаем.
+    joined = ""
+    for piece in out:
+        if (joined != "" and piece != ""
+                and re.search(r"[\wА-Яа-я]$", joined) and re.match(r"^[\wА-Яа-я]", piece)):
+            joined += " "
+        joined += piece
+    return re.sub(r"[ \t]{2,}", " ", joined)
 
 
 def selftest() -> int:

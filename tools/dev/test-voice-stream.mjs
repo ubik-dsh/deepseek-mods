@@ -94,6 +94,19 @@ async function main() {
   check('без точек кусок режется по запятой и не растёт в абзац',
     cut !== null && cut.text.length <= 80 && cut.consumed <= 80, `${cut?.text.length} знаков: ${cut?.text}`)
 
+  // ЛОВУШКА, УСЛЫШАННАЯ ОПЕРАТОРОМ. В фразе «…объявляет dsh.bundle.patch, и его слои…» рез шёл
+  // по точке ВНУТРИ имени: кусок кончался на «dsh.bundle», а следующий начинался с «patch,»,
+  // и половинки читались огрызками («бэндэл», «пэч»). Концом предложения считается только знак,
+  // за которым пробел или конец текста.
+  const dotted = 'объявляет dsh.bundle.patch, и его слои применяются в порядке dsh.profile.bundles'
+  check('точка внутри имени не режет кусок',
+    take(dotted, { min: 20, limit: 260 }) === null,
+    JSON.stringify(take(dotted, { min: 20, limit: 260 })))
+  const dottedEnd = take(`${dotted} дальше.`, { min: 20, limit: 260 })
+  check('настоящая точка в конце режет кусок целиком',
+    dottedEnd !== null && dottedEnd.text === `${dotted} дальше.`,
+    dottedEnd?.text ?? 'пусто')
+
   // --- 1б. как объявляются ожидания ------------------------------------------
   check('до минуты ожидание называется в секундах',
     module.describeWait(59) === 'Подождём 59 секунд.', module.describeWait(59))
@@ -293,6 +306,59 @@ async function main() {
   check('повтор начинается с метки нового ответа, как живое чтение',
     linesAfter.slice(linesBefore.length).map((line) => JSON.parse(line)).some((record) => record.command === 'begin'),
     JSON.stringify(linesAfter.slice(linesBefore.length).map((line) => line.trim()).slice(0, 3)))
+
+  // --- 4в. новый шаг внутри хода не выбрасывает недоговорённый хвост ----------
+  // `begin()` вызывается на КАЖДОЙ попытке, а попытка это и новый шаг того же хода. Раньше он
+  // чистил накопитель, и хвост предложения, начатого в одном шаге, пропадал: оператор услышал
+  // это как «между двумя латиницами теряется текст».
+  const beforeSplit = readFileSync(received, 'utf8').split('\n').filter((line) => line.trim() !== '').length
+  const splitFrames = [
+    { type: 'start', turn: 11 },
+    { type: 'chunk', chunk: { type: 'text-delta', text: 'Это начало фразы без точки, но уже длинное' } },
+    { type: 'start', turn: 11 },
+    { type: 'chunk', chunk: { type: 'text-delta', text: ', и вот её конец.' } },
+    { type: 'end' },
+  ]
+  for (const frame of splitFrames) repeatHook({ agent, frame })
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  const saidAfterSplit = readFileSync(received, 'utf8').split('\n').filter((line) => line.trim() !== '')
+    .slice(beforeSplit).map((line) => JSON.parse(line)).filter((record) => record.text)
+    .map((record) => record.text).join(' ')
+  check('новый шаг внутри хода не теряет недоговорённый хвост',
+    saidAfterSplit.includes('Это начало фразы без точки') && saidAfterSplit.includes('и вот её конец'),
+    saidAfterSplit === '' ? 'голосу не ушло ничего' : saidAfterSplit)
+
+  // --- 4г. мёртвая труба голоса не должна ронять харнесс ----------------------
+  // Я убил голосовой процесс снаружи, чтобы он взял свежий код, и запись в его вход уронила
+  // весь dsh: `fatal uncaught exception: Error: write EPIPE at VoiceStream.begin`. Ошибка потока
+  // это событие `error`, а не исключение метода, и без обработчика она фатальна для процесса.
+  const broken = new module.VoiceStream({
+    pythonPath: process.execPath, streamPath: fakeVoice, firstChunk: 20, chunkChars: 60,
+    fillers: false, maxChars: 6000, idleStopMs: 600000, readSubagents: false,
+  }, () => {})
+  broken.child = { stdin: { writable: false, write: () => { throw new Error('write EPIPE') } } }
+  let threw = null
+  try {
+    broken.begin()
+  } catch (error) {
+    threw = error
+  }
+  const forgotAfterBegin = broken.child === null
+  try {
+    broken.say('проверка мёртвой трубы')
+  } catch (error) {
+    threw = threw ?? error
+  }
+  const respawned = broken.child !== null
+  try {
+    broken.filler(1)
+    broken.stop('тест закончен: убираю поднятый процесс')
+  } catch (error) {
+    threw = threw ?? error
+  }
+  check('запись в мёртвый голосовой процесс не бросает исключение, а процесс поднимается заново',
+    threw === null && forgotAfterBegin && respawned,
+    `исключение: ${threw?.message ?? 'нет'}, обрыв замечен: ${forgotAfterBegin}, поднят заново: ${respawned}`)
   rmSync(stateDir, { recursive: true, force: true })
 
   // --- 5. браузерная половина --------------------------------------------------
