@@ -64,6 +64,15 @@ are an AI agent working here, read this first.
    copied out, so the installed preflight still matched a window by title alone. The
    code ran, the panel looked the same, and the fifth check of a five-check tool was
    missing on the machine that needed it.
+8. **Look at what is about to leave, before it leaves.** `git push` publishes every
+   commit between the mirror and HEAD, not the file you just edited, and a `git add -A`
+   publishes whatever was lying in the tree. A reader-only release here went out together
+   with the speech recogniser for exactly that reason: its commits were already local, and
+   nobody had looked. The secret scanner answers a different question ("is there a key in
+   a blob"); this one answers "what else is in this push". Run
+   `node tools/dev/pre-publish-check.mjs --all` before a commit and before a push, and
+   `node tools/dev/pre-publish-check.mjs --install-hook` once per clone: the hook is in
+   `.git/`, so it does not travel with the repository.
 
 ## Cheat sheet
 
@@ -90,6 +99,8 @@ node tools/dev/check-skills-synced.mjs # do the installed skill trees match the
                                        # published source? --sync to copy, --help
                                        # for the paused-skill rule
 node tools/dev/scan-secrets.mjs        # secrets in tracked names, blobs, and on disk
+node tools/dev/pre-publish-check.mjs --all   # what a commit or a push would publish;
+                                       # --install-hook puts it in front of every commit
 node tools/dev/verify-live.mjs         # live HTTP checks against a running GUI
 node tools/dev/verify-store-live.mjs      # the store of finds, live: task,
                                        # verdict gate, adopt, discuss, remove
