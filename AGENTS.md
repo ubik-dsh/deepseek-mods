@@ -50,7 +50,12 @@ are an AI agent working here, read this first.
    the home and never lands in `packages/` is lost on the next install. Run
    `node tools/dev/check-deployed.mjs` after either, and commit as soon as a fix
    is verified rather than batching it — drift between the two is invisible, because
-   the code keeps working and the panel looks the same.
+   the code keeps working and the panel looks the same. **A package that owns user
+   data inside its own folder must declare it in `package.json` as `dsh.preserve`**
+   (the voice reader declares its downloaded voice model and the pronunciation
+   dictionary): the installer copies those paths aside before replacing the folder
+   and puts them back file by file, and `check-deployed` stops calling them drift, so
+   nobody deletes a user's model to make a check pass.
 6. **Keep both languages in sync.** Every user-facing document exists as
    `X.md` (English) and `X.ru.md` (Russian).
 7. **The skills repository is the source; the installed trees are deployment.**
