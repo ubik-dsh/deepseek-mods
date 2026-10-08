@@ -78,8 +78,9 @@ One loader row in `~/.dsh/profiles/web/cordis.patch.yml`:
 | `device` | `cpu` | `cpu` or `cuda` |
 | `threads` | `0` | `torch` threads, 0 leaves torch alone |
 | `hubCache` / `modulesCache` | `''` | huggingface caches; empty uses the library default |
+| `preload` | `false` | load the model at activation instead of at the first phrase |
 | `requestTimeoutMs` | `300000` | the first request may download the weights |
-| `idleTimeoutMs` | `600000` | release ~1.5 GB of memory after this much silence |
+| `idleTimeoutMs` | `0` | `0` keeps the process alive (about 1.6 GB); a positive value releases it after that much silence |
 | `maxAudioBytes` | `33554432` | refuse a recording larger than this |
 | `providerId` | `gigaam-ru-local` | the id the voice panel stores |
 
@@ -110,6 +111,45 @@ operator switches; the service then checks the stored language (the shipped defa
 `auto`) against the new provider's list and refuses the switch when it is missing. The
 language dropdown only offers the languages of the provider already selected, so a
 provider advertising `ru` alone is unreachable from the interface.
+
+### Speed, measured on this machine
+
+The operator's complaint was "it works, but not very fast". Measured on three-second,
+ten-second and twenty-two-second speech, on the machine this mod was built for:
+
+| where it computes | model load | 3 s phrase | 10 s phrase | 22 s phrase |
+|---|---:|---:|---:|---:|
+| CPU, all cores | 3.85 s | 0.64 s | 1.51 s | 3.21 s |
+| CPU, four threads | 3.86 s | 0.97 s | 2.63 s | 5.47 s |
+| RTX 5070, torch 2.11+cu128 | 7.19 s | 0.24 s | 0.52 s | 1.09 s |
+
+Three consequences, and they are exactly what `idleTimeoutMs`, `threads` and `preload`
+exist for:
+
+- **Stopping the worker is the expensive part, not the recognition.** The model loads in
+  3.9 s on the CPU and 7.2 s on the card, while a three-second phrase takes 0.64 s and
+  0.24 s. Releasing the process after ten quiet minutes charges the next phrase several
+  times the work it asked for, and that is what a person feels as slow recognition.
+  `idleTimeoutMs: 0` keeps it alive for about 1.6 GB of memory. The default became 0
+  after that measurement.
+- **Fewer threads are worse, not gentler.** Four threads made the same phrases 1.5x to
+  1.7x slower than letting torch use every core, so `threads: 0` is the fast setting.
+- **The video card is about 2.9x faster than the CPU** on this material, and
+  `preload: true` pays its higher load cost at plugin activation instead of at the first
+  phrase, so nobody waits for it.
+
+The measured numbers live in `_voice\замер-скорости.json` in the workspace, and the
+benchmark that produced them is `_voice\_bench_speed.py`.
+
+### Running on the video card
+
+The interpreter is a separate environment, `_voice\gigaam-gpu-env`, built as
+`python -m venv --system-site-packages --without-pip` next to the CPU one: it borrows
+`torch 2.11+cu128` from the machine's main interpreter (the one whose CUDA already works)
+and adds `transformers` and friends into its own `site-packages`, so nothing in the main
+interpreter is touched and the working CPU environment stays as it is. That borrowing is
+the one thing to remember: if the main interpreter loses torch, this environment breaks
+with it.
 
 ## Installing and checking
 

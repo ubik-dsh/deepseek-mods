@@ -201,6 +201,16 @@ def main() -> int:
         if request.get("command") == "quit":
             send({"id": identifier, "ok": True})
             return 0
+        if request.get("command") == "warm":
+            # Прогреть модель заранее, не дожидаясь первой фразы: иначе её загрузку
+            # (3.9 с на процессоре, 7.2 с на видеокарте) платит тот, кто заговорил первым.
+            try:
+                load_seconds = 0.0 if recognizer.model is not None else recognizer.load()
+                send({"id": identifier, "ready": True, "revision": ARGS.revision,
+                      "loadSeconds": round(load_seconds, 2)})
+            except Exception as error:  # noqa: BLE001
+                send({"id": identifier, "error": f"{type(error).__name__}: {error}"})
+            continue
 
         try:
             if recognizer.model is None:

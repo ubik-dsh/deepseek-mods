@@ -22,31 +22,75 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { load as yamlLoad } from 'js-yaml'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = dirname(dirname(HERE))
 const PACKAGE = join(REPO, 'packages', 'speech-ru-gigaam')
 
-/** The interpreter that has torch 2.8 and transformers 4.57 on this machine. */
-const PYTHON = process.env.DSH_SPEECH_RU_PYTHON
-  ?? 'C:\\Users\\admin\\Documents\\ds1\\_voice\\gigaam-env\\Scripts\\python.exe'
-
 /** The recording used for the recognition check: the operator's own voice, TV on. */
 const WAV = process.env.DSH_SPEECH_RU_WAV
   ?? 'C:\\Users\\admin\\Documents\\ds1\\_voice\\takes\\2026-09-25_21-24-52.wav'
 
-/** The weights already downloaded for the measurements, so the test downloads nothing. */
-const HUB_CACHE = process.env.DSH_SPEECH_RU_HUB
-  ?? 'C:\\Users\\admin\\Documents\\ds1\\_voice\\_hf-cache'
-
 /**
- * Where `transformers` keeps the remote code it downloads. The default under
- * `%USERPROFILE%\.cache\huggingface` refuses new directories on this machine, so the
- * test names a writable one — the same reason the loader row carries `modulesCache`.
+ * Read the configuration the running harness actually deploys.
+ *
+ * The point of reading the profile's loader row instead of a constant here: the numbers
+ * that matter to the operator (which interpreter, which device, which caches) live in
+ * `cordis.patch.yml`, and a test that names its own interpreter would keep passing after
+ * the deployed row pointed somewhere else. Environment variables still win, so the test
+ * can be pointed at another machine without editing it.
  */
-const MODULES_CACHE = process.env.DSH_SPEECH_RU_MODULES ?? join(HUB_CACHE, 'modules')
+function deployedConfig() {
+  const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  const patch = join(home, 'profiles', 'web', 'cordis.patch.yml')
+  const fallback = {
+    pythonPath: 'C:\\Users\\admin\\Documents\\ds1\\_voice\\gigaam-env\\Scripts\\python.exe',
+    revision: 'e2e_rnnt',
+    device: 'cpu',
+    hubCache: 'C:\\Users\\admin\\Documents\\ds1\\_voice\\_hf-cache',
+    modulesCache: 'C:\\Users\\admin\\Documents\\ds1\\_voice\\_hf-cache\\modules',
+    source: `константа теста (${patch} не прочитан)`,
+  }
+  let deployed = fallback
+  try {
+    const yaml = yamlLoad(readFileSync(patch, 'utf8'))
+    const rows = yaml.flatMap((entry) => (Array.isArray(entry?.insert) ? entry.insert : []))
+    const row = rows.find((entry) => entry?.id === 'speech-ru-gigaam')
+    if (row?.config !== undefined) {
+      deployed = {
+        ...fallback,
+        ...row.config,
+        modulesCache: row.config.modulesCache ?? join(row.config.hubCache ?? fallback.hubCache, 'modules'),
+        source: `строка загрузчика в ${patch}`,
+      }
+    }
+  } catch (error) {
+    deployed = { ...fallback, source: `константа теста (${messageOf(error)})` }
+  }
+  return {
+    ...deployed,
+    pythonPath: process.env.DSH_SPEECH_RU_PYTHON ?? deployed.pythonPath,
+    device: process.env.DSH_SPEECH_RU_DEVICE ?? deployed.device,
+    revision: process.env.DSH_SPEECH_RU_REVISION ?? deployed.revision,
+    hubCache: process.env.DSH_SPEECH_RU_HUB ?? deployed.hubCache,
+    modulesCache: process.env.DSH_SPEECH_RU_MODULES ?? deployed.modulesCache,
+  }
+}
+
+const DEPLOYED = deployedConfig()
+const PYTHON = DEPLOYED.pythonPath
+const HUB_CACHE = DEPLOYED.hubCache
+const MODULES_CACHE = DEPLOYED.modulesCache
+
+/** Message of an unknown thrown value. */
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error)
+}
 
 const results = []
 const check = (title, passed, detail) => {
@@ -117,7 +161,8 @@ async function checkRegistration(module) {
       },
     },
   }
-  module.apply(ctx, { pythonPath: PYTHON, hubCache: HUB_CACHE })
+  module.apply(ctx, { pythonPath: PYTHON, hubCache: HUB_CACHE, modulesCache: MODULES_CACHE,
+    revision: DEPLOYED.revision, device: DEPLOYED.device })
   check('провайдер зарегистрирован в службе распознавания', registered !== null,
     registered === null ? 'register не вызван' : `id=${registered.info.id}`)
   check('провайдер объявляет русский язык и локальное размещение',
@@ -148,7 +193,7 @@ async function checkRegistration(module) {
 function runWorker() {
   return new Promise((resolve) => {
     const worker = join(PACKAGE, 'lib', 'worker.py')
-    const child = spawn(PYTHON, [worker, '--revision', 'e2e_rnnt', '--device', 'cpu',
+    const child = spawn(PYTHON, [worker, '--revision', DEPLOYED.revision, '--device', DEPLOYED.device,
       '--hub-cache', HUB_CACHE, '--modules-cache', MODULES_CACHE], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
@@ -173,7 +218,7 @@ function runWorker() {
         }
         if (message.ready === true) {
           check('модель GigaAM-v3 загрузилась в сторожевом процессе',
-            message.revision === 'e2e_rnnt' && Number(message.loadSeconds) > 0,
+            message.revision === DEPLOYED.revision && Number(message.loadSeconds) > 0,
             `ревизия ${message.revision}, загрузка ${message.loadSeconds} с`)
           continue
         }
@@ -235,6 +280,11 @@ async function checkProcess() {
         if (line.trim() === '') continue
         const request = JSON.parse(line)
         if (request.command === 'quit') { process.exit(0) }
+        // Прогрев: отвечаем как настоящий сторож, без звука.
+        if (request.command === 'warm') {
+          process.stdout.write(JSON.stringify({ id: request.id, ready: true, revision: 'fake', loadSeconds: 0.02 }) + '\\n')
+          continue
+        }
         // Запись приходит в base64, поэтому и метки сверяем в том же виде.
         const marker = (text) => Buffer.from(text).toString('base64')
         if (request.wav === marker('молчать')) continue
@@ -258,6 +308,13 @@ async function checkProcess() {
     requestTimeoutMs: 5000, idleTimeoutMs: 400, maxAudioBytes: 1024 * 1024, maxLogBytes: 4096,
   }
   const worker = new GigaAmWorker(config, { onLog: (line) => logged.push(line) })
+
+  const warmed = await worker.warm()
+  check('прогрев отвечает и не требует звука',
+    warmed.ready === true && Number(warmed.loadSeconds) >= 0,
+    JSON.stringify(warmed))
+  check('после прогрева процесс остаётся жив, а не перезапускается на первой фразе',
+    worker.child !== null, `child=${worker.child === null ? 'нет' : 'есть'}`)
 
   const first = await worker.transcribe(Buffer.from('привет'), new AbortController().signal)
   check('сторож отвечает, и ответ, разрезанный на части, склеивается',
@@ -304,7 +361,11 @@ async function checkProcess() {
 async function main() {
   console.log(`пакет: ${PACKAGE}`)
   console.log(`питон: ${PYTHON}`)
+  console.log(`устройство: ${DEPLOYED.device}, ревизия: ${DEPLOYED.revision}`)
+  console.log(`настройки взяты из: ${DEPLOYED.source}`)
   console.log(`запись: ${WAV}\n`)
+  check('устройство и ревизия взяты из настроек, а не из константы теста',
+    typeof DEPLOYED.source === 'string', DEPLOYED.source)
   const module = await checkShape()
   checkRefusal(module)
   await checkRegistration(module)

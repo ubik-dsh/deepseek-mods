@@ -50,9 +50,20 @@ export const PYANNOTE_STUB = join(HERE, 'pyannote-stub')
  * something the worker can be trusted with until the operator says otherwise.
  *
  * `requestTimeoutMs` is generous because the *first* request may download 428 MB of
- * weights (a few minutes on a slow line) and the first one also loads them. Later
- * requests take one to three seconds for a sentence. Point `hubCache` at a directory
- * that already holds the model and even the first request is fast.
+ * weights (a few minutes on a slow line) and the first one also loads them. Point
+ * `hubCache` at a directory that already holds the model and even the first request is
+ * fast.
+ *
+ * `idleTimeoutMs` is what the operator feels. Measured here on three-second speech:
+ * the model takes 3.9 s to load on the CPU and 7.2 s on the video card, while the
+ * transcription itself takes 0.64 s and 0.24 s. So every restart of the worker is
+ * several times more expensive than the work it was kept for, and stopping it after ten
+ * quiet minutes charges the next phrase the full load again. `0` never stops it: about
+ * 1.6 GB of memory stay held, and every phrase costs only its own transcription time.
+ *
+ * `preload` moves that load to plugin activation instead of the first phrase, so the
+ * operator never waits for it. It is off by default because a machine whose weights are
+ * not downloaded yet would start downloading 428 MB at boot.
  */
 export const DEFAULTS = {
   providerId: 'gigaam-ru-local',
@@ -63,8 +74,9 @@ export const DEFAULTS = {
   threads: 0,
   hubCache: '',
   modulesCache: '',
+  preload: false,
   requestTimeoutMs: 300000,
-  idleTimeoutMs: 600000,
+  idleTimeoutMs: 0,
   maxAudioBytes: 32 * 1024 * 1024,
   maxLogBytes: 64 * 1024,
 }
@@ -165,20 +177,24 @@ export class GigaAmWorker {
         this.onLog(`speech-ru-gigaam: не разобрал строку сторожа: ${line.slice(0, 200)}`)
         continue
       }
+      // A reply carrying an id settles the request that asked for it; the readiness
+      // announcement has no id and is only logged. The order matters: the answer to a
+      // warm request carries `ready` AND its id, and checking `ready` first swallowed it,
+      // leaving the caller to time out on a message that had already arrived.
+      const waiter = this.pending.get(message.id)
+      if (waiter !== undefined) {
+        this.pending.delete(message.id)
+        clearTimeout(waiter.timer)
+        waiter.signal?.removeEventListener('abort', waiter.onAbort)
+        if (typeof message.error === 'string') waiter.reject(new Error(message.error))
+        else waiter.resolve(message)
+        continue
+      }
       if (message.ready === true) {
         this.onLog(`speech-ru-gigaam: модель ${message.revision} загружена за ${message.loadSeconds} с`)
         continue
       }
-      const waiter = this.pending.get(message.id)
-      if (waiter === undefined) {
-        this.onLog(`speech-ru-gigaam: ответ без запроса: ${line.slice(0, 200)}`)
-        continue
-      }
-      this.pending.delete(message.id)
-      clearTimeout(waiter.timer)
-      waiter.signal?.removeEventListener('abort', waiter.onAbort)
-      if (typeof message.error === 'string') waiter.reject(new Error(message.error))
-      else waiter.resolve(message)
+      this.onLog(`speech-ru-gigaam: ответ без запроса: ${line.slice(0, 200)}`)
     }
   }
 
@@ -194,14 +210,35 @@ export class GigaAmWorker {
 
   /** Send one recording and wait for its transcript. */
   transcribe(audio, signal) {
-    const task = this.tail.then(() => this.exchange(audio, signal))
-    // Keep the chain alive whatever happens to one recording: a rejection must not
-    // poison every later request.
+    return this.enqueue(
+      { wav: Buffer.from(audio).toString('base64'), language: 'ru' },
+      { signal, timeoutMs: this.config.requestTimeoutMs, what: 'сторож не ответил' },
+    )
+  }
+
+  /**
+   * Load the model now, so the first phrase does not pay for it.
+   *
+   * Worth its own path: the load is 3.9 s on the CPU and 7.2 s on the video card, while
+   * a three-second phrase takes 0.64 s and 0.24 s. Whoever speaks first otherwise pays
+   * several times over for the work they asked for.
+   */
+  warm() {
+    return this.enqueue(
+      { command: 'warm' },
+      { signal: undefined, timeoutMs: this.config.requestTimeoutMs, what: 'модель не прогрелась' },
+    )
+  }
+
+  /** Serialize one exchange behind the previous one and keep the chain alive. */
+  enqueue(payload, options) {
+    const task = this.tail.then(() => this.exchange(payload, options))
+    // A rejection must not poison every later request.
     this.tail = task.then(() => undefined, () => undefined)
     return task
   }
 
-  exchange(audio, signal) {
+  exchange(payload, { signal, timeoutMs, what }) {
     signal?.throwIfAborted()
     this.start()
     if (this.idle !== null) {
@@ -230,8 +267,8 @@ export class GigaAmWorker {
       }
       waiter.timer = setTimeout(() => {
         this.pending.delete(id)
-        waiter.reject(new Error(`сторож не ответил за ${this.config.requestTimeoutMs} мс`))
-      }, this.config.requestTimeoutMs)
+        waiter.reject(new Error(`${what} за ${timeoutMs} мс`))
+      }, timeoutMs)
       waiter.onAbort = () => {
         this.pending.delete(id)
         clearTimeout(waiter.timer)
@@ -239,7 +276,7 @@ export class GigaAmWorker {
       }
       signal?.addEventListener('abort', waiter.onAbort, { once: true })
       this.pending.set(id, waiter)
-      child.stdin.write(`${JSON.stringify({ id, wav: Buffer.from(audio).toString('base64'), language: 'ru' })}\n`, (error) => {
+      child.stdin.write(`${JSON.stringify({ id, ...payload })}\n`, (error) => {
         if (error === undefined || error === null) return
         this.pending.delete(id)
         clearTimeout(waiter.timer)
@@ -339,6 +376,16 @@ export function apply(ctx, rawConfig) {
       },
     })
     ctx.logger?.info?.(`speech-ru-gigaam: распознаватель «${config.providerId}» зарегистрирован`)
+    if (config.preload) {
+      // Deliberately not awaited: loading the model must not hold up the harness boot,
+      // and a failure here is reported and survivable — the first recording would simply
+      // load the model itself.
+      worker.warm().then(
+        (answer) => ctx.logger?.info?.(
+          `speech-ru-gigaam: модель прогрета за ${answer.loadSeconds} с (${config.revision}, ${config.device})`),
+        (error) => ctx.logger?.warn?.(`speech-ru-gigaam: прогреть модель не вышло: ${messageOf(error)}`),
+      )
+    }
     return async () => {
       worker.stop()
       await worker.exit
