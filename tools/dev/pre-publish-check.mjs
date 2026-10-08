@@ -142,10 +142,15 @@ function contentOf(path, fromIndex) {
  * Files whose own content is the patterns, and which therefore trip every content rule.
  *
  * The list is deliberately exact paths, not patterns: a scanner that exempts anything holding the
- * word "token" exempts the very files this check exists to catch. These two are the checkers
- * themselves; everything else, including this file's own siblings, is judged normally.
+ * word "token" exempts the very files this check exists to catch. These are the checkers themselves
+ * (the third one looks for machine paths in plugin layers, so its own source holds those patterns);
+ * everything else, including this file's own siblings, is judged normally.
  */
-const SELF_EXEMPT = new Set(['tools/dev/pre-publish-check.mjs', 'tools/dev/scan-secrets.mjs'])
+const SELF_EXEMPT = new Set([
+  'tools/dev/pre-publish-check.mjs',
+  'tools/dev/scan-secrets.mjs',
+  'tools/dev/check-plugin-bundles.mjs',
+])
 
 /** Judge one file; returns a list of reasons, each with a severity. */
 function judge(path, size, content) {

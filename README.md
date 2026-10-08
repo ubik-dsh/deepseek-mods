@@ -5,7 +5,38 @@ agent harness whose browser UI is the `dsh web` GUI.
 
 > **Repository:** <https://gitverse.ru/ubikon/dsh-mods>
 
-Three mods live here:
+## Two ways to install, both supported
+
+**As a plugin (bundle).** This is what the **Plugins** panel in the sidebar and the DSH plugin list
+understand: the package declares its own loader layer (`dsh.bundle.patch`), so nothing has to be
+added to the configuration by hand. The voice reader and the Russian pack are bundles already.
+
+| Plugin | install spec | what it gives you |
+|---|---|---|
+| **Voice reader** | `github:ubik-dsh/deepseek-mods&path:/packages/voice-stream` | speaks answers aloud **while they are being written**, with "voice" and "read again" buttons in the chat header |
+| **Russian pack** | `github:ubik-dsh/deepseek-mods&path:/packages/locale-ru` | Russian for the whole interface |
+
+In the panel: **Plugins → Add plugin**, paste the spec. Or from the command line:
+
+```sh
+pnpm dsh plugin --profile web add 'github:ubik-dsh/deepseek-mods&path:/packages/voice-stream'
+```
+
+Pin a commit rather than a branch: `github:ubik-dsh/deepseek-mods#<commit>&path:/packages/voice-stream`.
+
+**The older way.** `node tools/install.mjs` copies every package into the profile and writes the
+loader rows itself. It is still here and does not conflict: a package that declares a layer brings
+its row with it, and the installer does not add a second one.
+
+**The voice reader needs a voice after installing:** the Silero model (59 MB) and a Python with
+torch. The order is in [packages/voice-stream/runtime/INSTALL.ru.md](packages/voice-stream/runtime/INSTALL.ru.md)
+(Russian); the package carries `runtime/получить-голос.py` to fetch the model and `runtime/сказать.py`
+to check it.
+
+## What is in here
+
+Nine packages live here; the main ones are below. The two bundles (voice reader and Russian pack)
+install from the panel, the other mods still install with the installer.
 
 | Mod | What it does |
 |---|---|

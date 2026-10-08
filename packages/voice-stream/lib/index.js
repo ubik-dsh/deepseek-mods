@@ -25,6 +25,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /** Cordis plugin name. */
 export const name = 'voice-stream'
@@ -431,16 +432,46 @@ export class VoiceStream {
   }
 }
 
-/** Reject a configuration that cannot work, loudly and at activation. */
+/**
+ * Настройки, которые нельзя записать в опубликованный слой.
+ *
+ * ПЛАГИН-СЛОЙ НЕ МОЖЕТ НЕСТИ МАШИННЫЕ ПУТИ. Пока пакет ставился своим установщиком, слой писал
+ * сам установщик, и пути к питону и к голосовому процессу лежали в нём. Когда пакет становится
+ * plugin-bundle, слой едет вместе с пакетом в общий репозиторий, и чужих путей там быть не
+ * должно. Поэтому: путь ищется в строке настроек, потом в окружении, а потом рядом с самим
+ * пакетом (у него внутри лежит папка `runtime`). Пустой настройки больше не бывает.
+ *
+ * @param raw - то, что стоит в строке загрузчика.
+ * @returns полная конфигурация.
+ */
 export function validateConfig(raw) {
   const config = { ...DEFAULTS, ...(raw ?? {}) }
-  for (const key of ['pythonPath', 'streamPath']) {
-    if (typeof config[key] !== 'string' || config[key].trim() === '') {
-      throw new Error(`voice-stream: set \`${key}\` in the loader row`)
-    }
-    if (!isAbsolute(config[key])) throw new Error(`voice-stream: ${key} must be absolute: ${config[key]}`)
-    if (!existsSync(config[key])) throw new Error(`voice-stream: ${key} does not exist: ${config[key]}`)
+  const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
+  if (typeof config.streamPath !== 'string' || config.streamPath.trim() === '') {
+    config.streamPath = config.streamPath || process.env.DSH_VOICE_STREAM
+      || join(packageRoot, 'runtime', 'say_stream.py')
   }
+  if (typeof config.pythonPath !== 'string' || config.pythonPath.trim() === '') {
+    // Имя без разделителей это поиск в PATH: так работает пустая настройка на новой машине.
+    config.pythonPath = config.pythonPath || process.env.DSH_VOICE_PYTHON || 'python'
+  }
+  if (!isAbsolute(config.streamPath)) {
+    throw new Error(`voice-stream: streamPath must be absolute: ${String(config.streamPath)}`)
+  }
+  if (!existsSync(config.streamPath)) {
+    throw new Error(`voice-stream: streamPath does not exist: ${String(config.streamPath)}. `
+      + 'Ожидается файл runtime/say_stream.py внутри установленного пакета; если путь задан '
+      + 'настройкой, проверьте его.')
+  }
+  const python = String(config.pythonPath)
+  const looksLikePath = /[\\/]/u.test(python)
+  if (looksLikePath && !isAbsolute(python)) {
+    throw new Error(`voice-stream: pythonPath must be absolute: ${python}`)
+  }
+  if (looksLikePath && !existsSync(python)) {
+    throw new Error(`voice-stream: pythonPath does not exist: ${python}`)
+  }
+  config.pythonPath = python
   return config
 }
 

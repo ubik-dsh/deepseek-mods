@@ -1,8 +1,8 @@
 {
   "name": "@local/dsh-locale-ru",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Russian language pack for the DSH Web GUI: registers the ru locale and Russian dictionaries for every shipped client namespace",
+  "description": "Russian language pack for the DSH Web GUI: registers the ru locale and Russian dictionaries for every shipped client namespace. Installs as a profile bundle (`dsh.bundle.patch`), and the old way (copy into the profile plus a loader row) keeps working",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -14,6 +14,7 @@
     "lib/index.js",
     "lib/client.js",
     "i18n",
+    "cordis.patch.yml",
     "README.md",
     "README.ru.md"
   ],
@@ -21,6 +22,9 @@
   "dsh": {
     "client": {
       "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "peerDependencies": {

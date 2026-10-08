@@ -20,7 +20,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -71,13 +71,22 @@ async function main() {
     !readsConnection || module.inject.includes('connection'),
     `inject=${JSON.stringify(module.inject)}, чтение ctx.connection: ${readsConnection}`)
 
+  // ПЛАГИН-BUNDLE НЕ НЕСЁТ МАШИННЫХ ПУТЕЙ, поэтому пустая настройка должна работать: процесс
+  // берётся из самого пакета, а питон из PATH. Явный несуществующий путь по-прежнему отвергается
+  // громко: опечатка в настройке не должна выглядеть как «голос молчит».
+  const defaults = module.validateConfig({})
+  check('без путей процесс берётся из пакета, а питон из PATH',
+    isAbsolute(defaults.streamPath) && defaults.streamPath.endsWith('say_stream.py')
+    && existsSync(defaults.streamPath) && defaults.pythonPath === 'python',
+    `streamPath=${defaults.streamPath}, pythonPath=${defaults.pythonPath}`)
+
   let refused = null
   try {
-    module.validateConfig({})
+    module.validateConfig({ streamPath: 'C:\\нет\\такого\\say_stream.py' })
   } catch (error) {
     refused = error
   }
-  check('без путей конфигурация отвергается на запуске', refused !== null, refused?.message)
+  check('явный несуществующий путь отвергается на запуске', refused !== null, refused?.message)
 
   // --- 1. нарезка кусков -----------------------------------------------------
   const take = module.takePiece

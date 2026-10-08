@@ -49,6 +49,7 @@ const MESSAGES = {
     discovered: (count) => `discovered ${count} package(s) in packages/`,
     installed: (name, path) => `installed ${name} -> ${path}`,
     preserved: (name, paths) => `kept ${name}: user data survives the update (${paths})`,
+    rowFromBundle: (name) => `${name} is a plugin bundle: its loader row comes from its own layer`,
     unchanged: (name) => `${name} is already up to date`,
     skipped: (name) => `SKIPPED ${name}: no package.json`,
     backupState: (path) => `backed up ${path}`,
@@ -71,6 +72,7 @@ const MESSAGES = {
     discovered: (count) => `найдено пакетов в packages/: ${count}`,
     installed: (name, path) => `установлен ${name} -> ${path}`,
     preserved: (name, paths) => `сохранены данные пользователя в ${name}: ${paths}`,
+    rowFromBundle: (name) => `${name} это плагин-bundle: строку загрузчика приносит его собственный слой`,
     unchanged: (name) => `${name} уже актуален`,
     skipped: (name) => `ПРОПУЩЕН ${name}: нет package.json`,
     backupState: (path) => `сохранён в бэкап: ${path}`,
@@ -129,6 +131,10 @@ function discoverPackages() {
         package: manifest.name,
         destination,
         client: manifest.dsh?.client !== undefined,
+        // Пакет, объявивший слой `dsh.bundle.patch`, это плагин-bundle: свою строку он вставляет
+        // сам своим слоем, и второй строки ему не нужно. Иначе на одном пакете окажутся две строки
+        // с одним id, и та, что без настроек, будет падать при запуске.
+        bundle: manifest.dsh?.bundle?.patch !== undefined,
       }
     })
 }
@@ -372,11 +378,17 @@ for (const entry of packages) {
 function ensureRows(patchPath, label) {
   let text = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : PATCH_TEMPLATE
   const missing = packages.filter((entry) => !new RegExp(`(^|\\s)id:\\s*${entry.id}\\s*$`, 'mu').test(text))
-  if (missing.length === 0) {
+  // Плагины-bundle свои строки приносят слоем, поэтому им строка не нужна. Старый способ
+  // установки при этом продолжает работать: пакет всё равно копируется в профиль, а строка
+  // приезжает из его собственного слоя.
+  const bundleOwned = missing.filter((entry) => entry.bundle === true)
+  for (const entry of bundleOwned) say(t.rowFromBundle(entry.package))
+  const rowsNeeded = missing.filter((entry) => entry.bundle !== true)
+  if (rowsNeeded.length === 0) {
     say(t.rowsPresent(label))
     return
   }
-  const entry = missing
+  const entry = rowsNeeded
     .map((mod) => `- insert:\n    - id: ${mod.id}\n      name: '${mod.package}'`)
     .join('\n\n')
   // The shipped template is comments plus a bare `[]`; appending after it would
