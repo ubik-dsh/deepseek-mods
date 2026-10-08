@@ -110,8 +110,22 @@ def _speak_silero(text: str, out: Path) -> None:
     import numpy as np
     import torch
     if _SILERO is None:
-        importer = torch.package.PackageImporter(str(SILERO_MODEL))
-        _SILERO = importer.load_pickle("tts_models", "model")
+        if not SILERO_MODEL.exists():
+            raise RuntimeError(
+                f"нет файла модели голоса: {SILERO_MODEL}. Достаньте его так: python получить-голос.py "
+                f"(или скопируйте v3_ru.pt с машины, где голос уже работает).")
+        # Модель это пакет torch, а не просто веса: `torch.package` читает её своей версией
+        # формата. На сильно другой сборке torch она не откроется, и без этой обёртки человек
+        # видел бы трассировку вместо причины, поэтому причину называем словами.
+        try:
+            importer = torch.package.PackageImporter(str(SILERO_MODEL))
+            _SILERO = importer.load_pickle("tts_models", "model")
+        except Exception as error:  # noqa: BLE001
+            raise RuntimeError(
+                f"модель голоса не открылась этой сборкой torch ({torch.__version__}): "
+                f"{type(error).__name__} {error}. Файл: {SILERO_MODEL}. Лечится так: перекачайте "
+                f"модель (python получить-голос.py) или поставьте torch той версии, на которой она "
+                f"собрана; переменная DSH_VOICE_MODEL позволяет держать модель вне пакета.") from error
     audio = _SILERO.apply_tts(text=text, speaker=SILERO_SPEAKER, sample_rate=48000)
     data = audio.numpy()
     if SILERO_RATE != 1.0:

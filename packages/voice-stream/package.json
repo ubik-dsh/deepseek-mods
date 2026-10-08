@@ -22,7 +22,12 @@
   "dsh": {
     "client": {
       "platform": "web"
-    }
+    },
+    "preserve": [
+      "runtime/voices",
+      "runtime/алиасы-речи.txt",
+      "runtime/ГОЛОС.txt"
+    ]
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2"

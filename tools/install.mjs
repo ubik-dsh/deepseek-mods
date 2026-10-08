@@ -21,8 +21,8 @@
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -48,6 +48,7 @@ const MESSAGES = {
     home: 'DSH home',
     discovered: (count) => `discovered ${count} package(s) in packages/`,
     installed: (name, path) => `installed ${name} -> ${path}`,
+    preserved: (name, paths) => `kept ${name}: user data survives the update (${paths})`,
     unchanged: (name) => `${name} is already up to date`,
     skipped: (name) => `SKIPPED ${name}: no package.json`,
     backupState: (path) => `backed up ${path}`,
@@ -69,6 +70,7 @@ const MESSAGES = {
     home: 'Домашний каталог DSH',
     discovered: (count) => `найдено пакетов в packages/: ${count}`,
     installed: (name, path) => `установлен ${name} -> ${path}`,
+    preserved: (name, paths) => `сохранены данные пользователя в ${name}: ${paths}`,
     unchanged: (name) => `${name} уже актуален`,
     skipped: (name) => `ПРОПУЩЕН ${name}: нет package.json`,
     backupState: (path) => `сохранён в бэкап: ${path}`,
@@ -254,6 +256,86 @@ if (BACKUP_ONLY) {
 }
 
 // ── 2. install the packages into the profile's node_modules ────────────────
+/**
+ * Paths inside a package that belong to the user and must survive replacement.
+ *
+ * Declared by the package itself, in `package.json` as `dsh.preserve`, so the rule is auditable
+ * and a package that owns no user data declares nothing. Deliberately a list, not a pattern:
+ * "keep everything that looks like data" is how stale files stay forever.
+ *
+ * @param source - the package directory in this checkout.
+ * @returns the declared relative paths, or an empty list.
+ */
+function preserveList(source) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+    const list = manifest?.dsh?.preserve
+    return Array.isArray(list) ? list.filter((item) => typeof item === 'string' && item !== '') : []
+  } catch {
+    return []
+  }
+}
+
+/** Every file under a directory, as relative paths with forward slashes. */
+function walkFiles(directory, base = directory, into = []) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name)
+    if (entry.isDirectory()) walkFiles(full, base, into)
+    else into.push(relative(base, full).replace(/\\/gu, '/'))
+  }
+  return into
+}
+
+/** Copy the user's paths out of a package before it is replaced. */
+function parkUserData(destination, list) {
+  const found = list.filter((relativePath) => existsSync(join(destination, relativePath)))
+  if (found.length === 0) return null
+  const parkDir = join(tmpdir(), `dsh-preserve-${Date.now()}`)
+  for (const relativePath of found) {
+    const to = join(parkDir, relativePath)
+    mkdirSync(dirname(to), { recursive: true })
+    cpSync(join(destination, relativePath), to, { recursive: true })
+  }
+  return { parkDir, found }
+}
+
+/**
+ * Put the parked paths back, file by file, and drop the parked copy.
+ *
+ * FILE BY FILE, NOT DIRECTORY BY DIRECTORY. The first version skipped a whole parked path when a
+ * directory of that name existed in the new build, so a downloaded model inside `runtime/voices/`
+ * was thrown away by an empty `runtime/voices/` in the source. Only a file the new build actually
+ * ships wins; everything else the user had comes back.
+ *
+ * @param destination - the freshly copied package.
+ * @param parked - what `parkUserData` set aside, or null.
+ * @param shipped - relative paths the new build ships.
+ * @returns the relative paths that were put back.
+ */
+function restoreUserData(destination, parked, shipped) {
+  if (parked === null) return []
+  const restored = []
+  const merge = (fromDir, toDir) => {
+    for (const entry of readdirSync(fromDir, { withFileTypes: true })) {
+      const from = join(fromDir, entry.name)
+      const to = join(toDir, entry.name)
+      if (entry.isDirectory()) {
+        mkdirSync(to, { recursive: true })
+        merge(from, to)
+        continue
+      }
+      const relativePath = relative(destination, to).replace(/\\/gu, '/')
+      if (shipped.has(relativePath)) continue
+      mkdirSync(dirname(to), { recursive: true })
+      cpSync(from, to)
+      restored.push(relativePath)
+    }
+  }
+  merge(parked.parkDir, destination)
+  rmSync(parked.parkDir, { recursive: true, force: true })
+  return restored
+}
+
 if (!DRY_RUN) mkdirSync(target, { recursive: true })
 for (const entry of packages) {
   const source = join(PACKAGES_DIR, entry.directory)
@@ -270,10 +352,19 @@ for (const entry of packages) {
     say(t.installed(entry.package, destination))
     continue
   }
-  // Replace rather than merge, so a stale file from an older build cannot stay.
+  // Replace rather than merge, so a stale file from an older build cannot stay. BUT user data
+  // inside a package (a downloaded voice model, an edited pronunciation dictionary) must survive:
+  // the package names it in `dsh.preserve`, and this tool copies those paths aside, replaces the
+  // tree, then puts them back. Copying rather than moving means a failed replacement still leaves
+  // the originals in place, and the parked copy is only removed after a successful restore.
+  const keep = preserveList(source)
+  const shipped = new Set(walkFiles(source))
+  const parked = parkUserData(destination, keep)
   rmSync(destination, { recursive: true, force: true })
   cpSync(source, destination, { recursive: true })
+  const restored = restoreUserData(destination, parked, shipped)
   say(t.installed(entry.package, destination))
+  if (restored.length > 0) say(t.preserved(entry.package, restored.join(', ')))
 }
 
 // ── 3. make sure every loader row exists ───────────────────────────────────

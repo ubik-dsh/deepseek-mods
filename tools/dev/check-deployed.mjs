@@ -100,8 +100,22 @@ for (const folder of packages) {
         + `deployed ${String(statSync(target).size)} b)`)
     }
   }
+  // Files the package declares as the user's own (`dsh.preserve`) are expected to exist only in
+  // the deployment: a downloaded voice model, an edited dictionary. Without this, the honest
+  // answer "the user's data is there" reads as drift and someone deletes the model to pass a check.
+  const preserved = (() => {
+    try {
+      const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+      const list = manifest?.dsh?.preserve
+      return Array.isArray(list) ? list : []
+    } catch {
+      return []
+    }
+  })()
+  const isPreserved = (file) => preserved.some((relative) => file === relative || file.startsWith(`${relative}/`))
+
   for (const file of inDeployed) {
-    if (!inSource.includes(file)) differences.push(`only in deployment: ${file}`)
+    if (!inSource.includes(file) && !isPreserved(file)) differences.push(`only in deployment: ${file}`)
   }
 
   if (differences.length === 0) {
