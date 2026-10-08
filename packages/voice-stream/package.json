@@ -1,18 +1,20 @@
 {
   "name": "@local/dsh-voice-stream",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "DSH plugin: read the assistant's answer aloud as it is being written, with pre-synthesized filler phrases, spoken wait announcements, and a panel button that mutes the voice",
+  "description": "DSH plugin: speak the assistant's answer aloud while it is still being written. Ships the Russian voice runtime (warm Silero process, filler-phrase cache, number and Latin-script preparation) plus a language-independent browser control; runtime/SKILL.md explains how to port it to another language or TTS engine",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./runtime/say_stream.py": "./runtime/say_stream.py",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/client.js",
+    "runtime",
     "README.md",
     "README.ru.md"
   ],

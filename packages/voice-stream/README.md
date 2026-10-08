@@ -2,6 +2,29 @@
 
 **English** · [Русский](README.ru.md)
 
+**Porting this to another language or another TTS engine: [`runtime/SKILL.md`](runtime/SKILL.md).**
+It is the portable form of the work: the live-stream hook, the warm synthesis process, text
+preparation for speech, the filler cache, the mute control, and the twelve traps that were measured
+while building it.
+
+**Installing this Russian reader on another machine:
+[`runtime/INSTALL.ru.md`](runtime/INSTALL.ru.md)** (Russian on purpose: the voice, the numbers and
+the letter names are Russian, so it should not be installed by mistake where another language is
+needed).
+
+## What is in the package
+
+| where | what |
+|---|---|
+| `lib/index.js` | the mod: live answer stream, piece cutting, fillers, wait announcements, the panel route |
+| `lib/client.js` | the "Голос: вкл / выкл" button in the chat header |
+| `runtime/say_stream.py` | the warm voice process: queue, synthesis/playback pipeline, filler cache |
+| `runtime/speak.py` | the engine: Silero, voice `xenia`, +10% rate |
+| `runtime/числа.py`, `runtime/латиница.py` | text preparation: numbers, units, versions, Latin script |
+| `runtime/алиасы-речи.txt` | the pronunciation dictionary a human edits |
+| `runtime/INSTALL.ru.md` | installation on another machine |
+| `runtime/SKILL.md` | porting to another language or engine |
+
 ## What it fixes
 
 The first reader (`_voice\dsh_voice.mjs`) watched the session log, and the log only receives
