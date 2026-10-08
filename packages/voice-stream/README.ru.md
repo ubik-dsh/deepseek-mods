@@ -12,8 +12,13 @@
 свой слой `cordis.patch.yml` через `dsh.bundle.patch`, и машинных путей в слое нет. Spec:
 
 ```
-github:ubik-dsh/deepseek-mods&path:/packages/voice-stream
+github:ubik-dsh/deepseek-mods#path:/packages/voice-stream
 ```
+
+Подкаталог выбирает **решётка** (`#path:`), и это проверено установкой: pnpm подтягивает именно
+`@local/dsh-voice-stream` вместе со слоем и папкой `runtime`. Форма с амперсандом не работает.
+Закрепить коммит: `#path:/packages/voice-stream&<commit>`; поставить без GitHub: склонировать
+репозиторий и взять `link:<путь>/packages/voice-stream`.
 
 Путь к голосовому процессу плагин берёт из самого пакета (папка `runtime`), а питон из переменной
 `DSH_VOICE_PYTHON` или из `python` в PATH. Свой путь можно дописать в строке загрузчика: слой

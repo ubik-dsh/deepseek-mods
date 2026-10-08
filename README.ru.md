@@ -13,16 +13,23 @@
 
 | Плагин | spec для установки | что даёт |
 |---|---|---|
-| **Говорилка** | `github:ubik-dsh/deepseek-mods&path:/packages/voice-stream` | читает ответы вслух **по мере печати**, с кнопками «Голос» и «Повторить» в шапке |
-| **Русификатор** | `github:ubik-dsh/deepseek-mods&path:/packages/locale-ru` | русский язык всего интерфейса |
+| **Говорилка** | `github:ubik-dsh/deepseek-mods#path:/packages/voice-stream` | читает ответы вслух **по мере печати**, с кнопками «Голос» и «Повторить» в шапке |
+| **Русификатор** | `github:ubik-dsh/deepseek-mods#path:/packages/locale-ru` | русский язык всего интерфейса |
+
+Подкаталог пакета в монорепозитории выбирает **решётка**: `#path:/packages/...`. Это проверено
+установкой: pnpm подтягивает именно `@local/dsh-voice-stream` вместе с его слоем
+`cordis.patch.yml` и папкой `runtime`. Форма с амперсандом (`&path:/packages/...`) **не работает**:
+pnpm принимает её за обычную ссылку на git и ставит весь репозиторий одним пакетом без имени.
 
 В панели: **Plugins → Add plugin**, вставить spec. Или командой:
 
 ```sh
-pnpm dsh plugin --profile web add 'github:ubik-dsh/deepseek-mods&path:/packages/voice-stream'
+pnpm dsh plugin --profile web add 'github:ubik-dsh/deepseek-mods#path:/packages/voice-stream'
 ```
 
-Ставьте по коммиту, а не по ветке: `github:ubik-dsh/deepseek-mods#<commit>&path:/packages/voice-stream`.
+Закрепить коммит (рекомендуется): `#path:/packages/voice-stream&<commit>`. Если хочется полной
+закреплённости, есть и путь без сети до GitHub: клонировать репозиторий (он же лежит на GitVerse)
+и поставить из папки — `pnpm dsh plugin --profile web add 'link:<путь>/packages/voice-stream'`.
 
 **Старый способ.** `node tools/install.mjs` копирует все пакеты в профиль и дописывает строки сам.
 Он никуда не делся и новому не мешает: пакет, объявивший слой, строку приносит слоем, и установщик

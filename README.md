@@ -13,16 +13,23 @@ added to the configuration by hand. The voice reader and the Russian pack are bu
 
 | Plugin | install spec | what it gives you |
 |---|---|---|
-| **Voice reader** | `github:ubik-dsh/deepseek-mods&path:/packages/voice-stream` | speaks answers aloud **while they are being written**, with "voice" and "read again" buttons in the chat header |
-| **Russian pack** | `github:ubik-dsh/deepseek-mods&path:/packages/locale-ru` | Russian for the whole interface |
+| **Voice reader** | `github:ubik-dsh/deepseek-mods#path:/packages/voice-stream` | speaks answers aloud **while they are being written**, with "voice" and "read again" buttons in the chat header |
+| **Russian pack** | `github:ubik-dsh/deepseek-mods#path:/packages/locale-ru` | Russian for the whole interface |
+
+The **hash** selects the package's subdirectory in this monorepo: `#path:/packages/...`. Verified by
+installing: pnpm fetches `@local/dsh-voice-stream` itself, together with its `cordis.patch.yml` layer
+and its `runtime` folder. The ampersand form (`&path:/packages/...`) **does not work**: pnpm reads it
+as a plain git link and installs the whole repository as one unnamed package.
 
 In the panel: **Plugins → Add plugin**, paste the spec. Or from the command line:
 
 ```sh
-pnpm dsh plugin --profile web add 'github:ubik-dsh/deepseek-mods&path:/packages/voice-stream'
+pnpm dsh plugin --profile web add 'github:ubik-dsh/deepseek-mods#path:/packages/voice-stream'
 ```
 
-Pin a commit rather than a branch: `github:ubik-dsh/deepseek-mods#<commit>&path:/packages/voice-stream`.
+Pin a commit (recommended): `#path:/packages/voice-stream&<commit>`. To avoid GitHub entirely, clone
+the repository (the same content is on GitVerse) and install from the folder:
+`pnpm dsh plugin --profile web add 'link:<path>/packages/voice-stream'`.
 
 **The older way.** `node tools/install.mjs` copies every package into the profile and writes the
 loader rows itself. It is still here and does not conflict: a package that declares a layer brings
