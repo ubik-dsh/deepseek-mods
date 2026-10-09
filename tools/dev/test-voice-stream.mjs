@@ -17,7 +17,7 @@
  * @module tools/dev/test-voice-stream
  */
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, isAbsolute, join } from 'node:path'
@@ -75,10 +75,11 @@ async function main() {
   // берётся из самого пакета, а питон из PATH. Явный несуществующий путь по-прежнему отвергается
   // громко: опечатка в настройке не должна выглядеть как «голос молчит».
   const defaults = module.validateConfig({})
-  check('без путей процесс берётся из пакета, а питон из PATH',
+  check('без путей процесс берётся из пакета, а питон ищется в PATH',
     isAbsolute(defaults.streamPath) && defaults.streamPath.endsWith('say_stream.py')
-    && existsSync(defaults.streamPath) && defaults.pythonPath === 'python',
-    `streamPath=${defaults.streamPath}, pythonPath=${defaults.pythonPath}`)
+    && existsSync(defaults.streamPath) && typeof defaults.pythonSource === 'string'
+    && defaults.pythonPath !== '',
+    `streamPath=${defaults.streamPath}, pythonPath=${defaults.pythonPath} (${defaults.pythonSource})`)
 
   let refused = null
   try {
@@ -368,6 +369,82 @@ async function main() {
   check('запись в мёртвый голосовой процесс не бросает исключение, а процесс поднимается заново',
     threw === null && forgotAfterBegin && respawned,
     `исключение: ${threw?.message ?? 'нет'}, обрыв замечен: ${forgotAfterBegin}, поднят заново: ${respawned}`)
+  // --- 4д. платформа: питон, сбой запуска и внятный отказ ----------------------
+  // Задание с Ubuntu 24.04: там нет команды `python`, и `spawn python ENOENT` уронил ВЕСЬ харнесс,
+  // потому что у ChildProcess не было обработчика `'error'`. Проверяем и выбор имени, и то, что
+  // отказ не убивает процесс, и что повторные попытки не копятся.
+  const fakeBin = mkdtempSync(join(tmpdir(), 'dsh-voice-bin-'))
+  writeFileSync(join(fakeBin, 'python3'), '#!/bin/sh\nexit 0\n')
+  const linuxFind = module.resolveInterpreter({ env: { PATH: fakeBin }, platform: 'linux' })
+  check('на linux выбран python3, если он есть в PATH',
+    linuxFind.command.endsWith('python3') && linuxFind.missing !== true, linuxFind.command)
+  const linuxFallback = module.resolveInterpreter({ env: { PATH: '' }, platform: 'linux' })
+  check('без питона в PATH отказ помечен, а не выдуман',
+    linuxFallback.missing === true && linuxFallback.command === 'python3',
+    `${linuxFallback.command} (${linuxFallback.source})`)
+  check('на windows первым идёт python, на linux первым python3',
+    module.defaultPythonNames('win32').join(',') === 'python,python3'
+    && module.defaultPythonNames('linux').join(',') === 'python3,python',
+    module.defaultPythonNames('win32').join(','))
+  const given = module.resolveInterpreter({ configured: '/opt/py/bin/python3', env: { PATH: '' }, platform: 'linux' })
+  check('заданный питон не переопределяется поиском',
+    given.command === '/opt/py/bin/python3' && given.source.includes('задано'), given.command)
+  rmSync(fakeBin, { recursive: true, force: true })
+
+  // СБОЙ ЗАПУСКА НЕ РОНЯЕТ ХАРНЕСС. Здесь запускаем НАСТОЯЩИЙ spawn с несуществующей программой:
+  // именно этот случай давал `fatal uncaught exception` на Ubuntu.
+  const brokenPython = new module.VoiceStream({
+    pythonPath: 'этого-питона-нет-нигде', streamPath: join(PACKAGE, 'runtime', 'say_stream.py'),
+    firstChunk: 20, chunkChars: 60, fillers: false, maxChars: 6000, idleStopMs: 600000,
+    readSubagents: false,
+  }, () => {})
+  let launchThrew = null
+  try {
+    brokenPython.start()
+    brokenPython.say('первая фраза')
+    brokenPython.say('вторая фраза')
+  } catch (error) {
+    launchThrew = error
+  }
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  check('отсутствие программы не бросает исключение и записывается причиной',
+    launchThrew === null && brokenPython.child === null && typeof brokenPython.lastError === 'string',
+    launchThrew === null ? `причина: ${brokenPython.lastError}` : `бросило: ${launchThrew.message}`)
+  check('повторные попытки запуска не копятся (одна попытка на все фразы)',
+    brokenPython.startFailures === 1, `попыток: ${brokenPython.startFailures}`)
+
+  // Питона нет вовсе: плагин обязан подняться и объяснить, что поставить.
+  const noPython = module.validateConfig({ streamPath: join(PACKAGE, 'runtime', 'say_stream.py') })
+  check('пустая настройка не падает, а называет найденный питон',
+    typeof noPython.pythonPath === 'string' && noPython.pythonPath !== ''
+    && noPython.pythonSource !== undefined, `${noPython.pythonPath} (${noPython.pythonSource})`)
+
+  // ЗАДАНИЕ ПРИЁМКИ: `DSH_VOICE_PYTHON=/nonexistent` — сервер поднимается, кнопка неактивна и
+  // называет причину. Значит конфигурация с несуществующим путём НЕ бросает, а помечает отказ.
+  const bogus = module.validateConfig({
+    streamPath: join(PACKAGE, 'runtime', 'say_stream.py'),
+    pythonPath: join(tmpdir(), 'нет-такого-питона', 'python3'),
+  })
+  const bogusVoice = new module.VoiceStream(bogus, () => {})
+  check('несуществующий заданный питон не ломает подъём мода, а даёт причину для кнопки',
+    bogus.pythonMissing === true && typeof bogusVoice.lastError === 'string'
+    && bogusVoice.lastError.includes('не существует'),
+    bogusVoice.lastError ?? 'причины нет')
+
+  const panelSource = readFileSync(join(PACKAGE, 'lib', 'client.js'), 'utf8')
+  check('кнопка показывает причину недоступности голоса, а не молчит',
+    panelSource.includes('voiceError') && panelSource.includes('голос недоступен'),
+    panelSource.includes('voiceError') ? 'состояние и подпись на месте' : 'поля voiceError нет')
+
+  // ВЫБОР ПРОИГРЫВАТЕЛЯ. Платформенную ветку нельзя проверить «своим» запуском, поэтому она
+  // вынесена в чистую функцию с подменяемым поиском, а здесь мы гоняем её для всех платформ.
+  const selftest = spawnSync(module.resolveInterpreter({}).command,
+    [join(PACKAGE, 'runtime', 'say_stream.py'), '--selftest'], { encoding: 'utf8', timeout: 120000 })
+  const selftestOut = `${selftest.stdout ?? ''}${selftest.stderr ?? ''}`
+  const selftestCount = /проверок: (\d+), провалов: (\d+)/u.exec(selftestOut)
+  check('выбор проигрывателя проходит проверку на всех платформах',
+    selftest.status === 0 && selftestCount !== null && selftestCount[2] === '0',
+    selftestCount === null ? selftestOut.trim().split('\n').slice(-3).join(' | ') : `${selftestCount[1]} проверок`)
   rmSync(stateDir, { recursive: true, force: true })
 
   // --- 5. браузерная половина --------------------------------------------------
