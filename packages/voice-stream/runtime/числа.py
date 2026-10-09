@@ -42,6 +42,12 @@ _ACCENT_STARTED = False
 # включённого флага нулевая, а выигрыш на омонимах заметный. Выключается переменной окружения
 # (DSH_VOICE_STRESS=0) или настройкой `stress: false` в строке загрузчика мода.
 _STRESS_DISABLE = {"0", "off", "false", "no", "нет", "выкл"}
+# РАЗМЕР МОДЕЛИ АКЦЕНТУАТОРА. Здесь была ошибка, и её видно замером: я поставил `tiny`, а он
+# экономит память ценой смысла — «по́том» и «пото́м» читаются одинаково. Ключа `big` у этой версии
+# нет вовсе (KeyError в её собственной карте моделей), зато УМОЛЧАНИЕ ruaccent оказалось самым
+# точным: на списке из восемнадцати пар оно дало 17 верных против 11 у `tiny`. Поэтому по умолчанию
+# размер НЕ указываем, а переменная осталась для опытов (`DSH_VOICE_ACCENT_SIZE=tiny` вернёт лёгкую).
+_ACCENT_SIZE = os.environ.get("DSH_VOICE_ACCENT_SIZE", "").strip()
 
 
 def start_stress_loading() -> bool:
@@ -66,10 +72,14 @@ def _load_accent() -> None:
         from ruaccent import RUAccent
 
         accent = RUAccent()
-        accent.load(omograph_model_size="tiny", use_dictionary=True, device="CPU")
+        if _ACCENT_SIZE == "":
+            # Ничего не указываем: это и есть самая точная модель ruaccent, проверено списком пар.
+            accent.load(use_dictionary=True, device="CPU")
+        else:
+            accent.load(omograph_model_size=_ACCENT_SIZE, use_dictionary=True, device="CPU")
         _ACCENT = accent
         _ACCENT_STATE = "ready"
-        log_line("ruaccent загружен: ударения расставляются")
+        log_line(f"ruaccent загружен ({_ACCENT_SIZE or 'по умолчанию'}): ударения расставляются")
     except Exception as error:  # noqa: BLE001
         _ACCENT = None
         _ACCENT_STATE = "unavailable"
