@@ -2,6 +2,13 @@
 
 **English** · [Русский](README.ru.md)
 
+> **Check the platform before installing.** The reader works on Windows and on Linux, but the
+> requirements differ. **Windows:** sound through `winsound`, nothing to install. **Linux:** you need
+> `python3` with `torch` and `numpy` (about 3 GB) and one player: `aplay` (package `alsa-utils`),
+> `paplay` (`pulseaudio-utils`), `ffplay` or `mpv`. **macOS:** `afplay`, which ships with the system.
+> The voice model `v3_ru.pt` (59 MB) is downloaded separately either way. If the interpreter or the
+> player is missing, the harness keeps running and the voice button states the reason.
+
 **Porting this to another language or another TTS engine: [`runtime/SKILL.md`](runtime/SKILL.md).**
 It is the portable form of the work: the live-stream hook, the warm synthesis process, text
 preparation for speech, the filler cache, the mute control, and the twelve traps that were measured
