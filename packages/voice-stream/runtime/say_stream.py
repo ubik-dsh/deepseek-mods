@@ -208,18 +208,29 @@ def selftest() -> int:
 
 
 def prepare_fillers() -> None:
-    """Синтезировать недостающие подводки. Готовые не трогаем: это кэш."""
+    """Синтезировать недостающие подводки. Готовые не трогаем: это кэш.
+
+    ПОДВОДКИ ЗВУЧАТ БЕЗ УСКОРЕНИЯ, а ответы с ним. Оператор выбрал +10% для чтения ответов
+    («слушал 10 и 21, оставил 10»), но у Silero нет числового темпа: он ускоряет пересчётом
+    отсчётов, и ПИТЧ растёт вместе со скоростью. На длинной фразе это незаметно, а на коротком
+    «Смотрю.» слышно как чужой голос — оператор так и сказал: «звучит странно». Поэтому подводки
+    синтезируем при естественном темпе, а выбранные +10% остаются для ответов.
+    """
     FILLER_DIR.mkdir(parents=True, exist_ok=True)
     made = 0
+    saved_rate = getattr(voice, "SILERO_RATE", 1.0)
     for index, text in enumerate(FILLERS):
         path = filler_path(index)
         if path.exists() and path.stat().st_size > 1000:
             continue
         try:
+            voice.SILERO_RATE = 1.0
             voice._speak_silero(text, path)  # noqa: SLF001 — голос тот же, что у speak.py
             made += 1
         except Exception as error:  # noqa: BLE001
             log(f"подводку «{text}» не синтезировать: {type(error).__name__} {error}")
+        finally:
+            voice.SILERO_RATE = saved_rate
     if made:
         log(f"подводки готовы: синтезировано {made} из {len(FILLERS)}, остальные из кэша")
 
