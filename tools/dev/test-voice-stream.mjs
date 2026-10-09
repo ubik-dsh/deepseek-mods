@@ -505,6 +505,24 @@ async function main() {
     actionVoice.action('Выполняю команду') === false && actionSent.length === 2,
     'выключено')
 
+  // --- 4з. ударения -----------------------------------------------------------
+  // Оператор выбрал ruaccent для ударений. Мод только передаёт выключатель, пометки расставляет
+  // голосовой процесс, и без акцентуатора текст обязан уходить как есть.
+  const stressConfig = module.validateConfig({ streamPath: join(PACKAGE, 'runtime', 'say_stream.py') })
+  check('ударения включены настройкой по умолчанию',
+    stressConfig.stress === true, `stress=${String(stressConfig.stress)}`)
+  check('выключатель ударений доходит до подготовки текста',
+    readFileSync(join(PACKAGE, 'lib', 'index.js'), 'utf8').includes('DSH_VOICE_STRESS')
+    && readFileSync(join(PACKAGE, 'runtime', 'числа.py'), 'utf8').includes('DSH_VOICE_STRESS'),
+    'переменная есть и в моде, и в подготовке текста')
+  const numbers = spawnSync(module.resolveInterpreter({}).command,
+    [join(PACKAGE, 'runtime', 'числа.py'), '--selftest'], { encoding: 'utf8', timeout: 180000 })
+  const numbersOut = `${numbers.stdout ?? ''}${numbers.stderr ?? ''}`
+  const numbersCount = /проверок: (\d+), провалов: (\d+)/u.exec(numbersOut)
+  check('подготовка текста проходит свою проверку (числа, латиница, ударения)',
+    numbers.status === 0 && numbersCount !== null && numbersCount[2] === '0',
+    numbersCount === null ? numbersOut.trim().split('\n').slice(-2).join(' | ') : `${numbersCount[1]} проверок`)
+
   // --- 5. браузерная половина --------------------------------------------------
   let bundle = null
   globalThis.window = { __ModuleLoader__: { load: (definition) => { bundle = definition } } }

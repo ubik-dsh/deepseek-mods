@@ -132,6 +132,16 @@ Each one was hit, diagnosed and fixed here. They are listed in the order they co
     `stdin.writable`, catches the throw, attaches an `error` listener, and forgets the child so the
     next phrase spawns a fresh one. Test it by faking a closed, unwritable pipe: the test must prove
     that the call neither throws nor leaves the plugin believing the voice is alive.
+17. **The engine can be told the stress, and it obeys the mark, not the accent.** Russian homographs
+    carry meaning in the stress (`за́мок` castle, `замо́к` lock), and a synthesiser guesses. Measured
+    on Silero `v3_ru` with `xenia`: a `+` before the stressed vowel **moves** the emphasis (the
+    amplitude envelope changes when the mark sits on the second syllable), while the combining acute
+    accent `U+0301` is silently dropped and produces byte-identical audio to unmarked text. So mark
+    with `+`, place the marks as the LAST preparation step (the normaliser and the number rules treat
+    `+` as a foreign sign), and keep the accentor optional: `ruaccent` places the marks in about
+    0.05 s per phrase but needs tens of seconds to load, so load it in a background thread and let
+    the first phrases go unmarked. Its smallest model still errs on rare homographs (`потом`), which
+    is worth saying out loud rather than hiding.
 
 ## How to verify
 

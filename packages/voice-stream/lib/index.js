@@ -86,6 +86,16 @@ export const DEFAULTS = {
   actionRepeatMs: 15000,
   /** Сколько думать молча, прежде чем сказать «обдумываю». */
   thinkingAfterMs: 4000,
+  /**
+   * Расставлять ли ударения перед синтезом.
+   *
+   * Русский голос ставит ударение сам и на омонимах ошибается: «за́мок» и «замо́к». Пометку «+»
+   * перед ударной гласной он понимает (проверено замером: пометка на втором слоге меняет форму
+   * звука, на первом не меняет ничего). Расставляет пометки необязательная зависимость ruaccent
+   * в голосовом процессе: нет её — текст уходит как есть и читалка работает ровно как раньше,
+   * поэтому включено по умолчанию, цена ошибки нулевая.
+   */
+  stress: true,
 }
 
 /** Message of an unknown thrown value. */
@@ -353,7 +363,14 @@ export class VoiceStream {
     try {
       child = spawn(this.config.pythonPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: 'utf-8',
+          PYTHONUNBUFFERED: '1',
+          // Ударения расставляет голосовой процесс (ruaccent), а включает их эта переменная: одна
+          // настройка в строке загрузчика, а не две в разных местах.
+          DSH_VOICE_STRESS: this.config.stress === true ? '1' : '0',
+        },
       })
     } catch (error) {
       // `spawn` бросает синхронно на неверных аргументах; `ENOENT` приходит событием ниже.

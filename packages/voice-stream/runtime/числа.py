@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -27,6 +28,71 @@ HERE = Path(__file__).resolve().parent
 # и правки в алиасы-речи.txt при обновлении пропадут. Переменная DSH_VOICE_ALIASES это лечит.
 _ALIASES_FROM_ENV = os.environ.get("DSH_VOICE_ALIASES")
 ALIAS_FILE = Path(_ALIASES_FROM_ENV) if _ALIASES_FROM_ENV else HERE / "алиасы-речи.txt"
+
+# УДАРЕНИЯ. Русский синтез ставит ударение сам и на омографах ошибается: «за́мок» и «замо́к»,
+# «сто́ит» и «стои́т». Голос понимает пометку «+» перед ударной гласной, и это проверено замером:
+# пометка на втором слоге меняет форму звука, а на первом не меняет ничего, потому что там
+# ударение и так по умолчанию. Пометки расставляет ruaccent — зависимость НЕОБЯЗАТЕЛЬНАЯ: нет её,
+# текст уходит как есть, и читалка работает ровно как раньше. Загрузка занимает десятки секунд,
+# поэтому идёт в фоне: первые фразы звучат без пометок, дальше с ними.
+_ACCENT: object | None = None
+_ACCENT_STATE = "off"          # off | loading | ready | unavailable
+_ACCENT_STARTED = False
+# ВКЛЮЧЕНО ПО УМОЛЧАНИЮ, и это осознанно: без ruaccent текст уходит как есть, то есть цена
+# включённого флага нулевая, а выигрыш на омонимах заметный. Выключается переменной окружения
+# (DSH_VOICE_STRESS=0) или настройкой `stress: false` в строке загрузчика мода.
+_STRESS_DISABLE = {"0", "off", "false", "no", "нет", "выкл"}
+
+
+def start_stress_loading() -> bool:
+    """Начать загрузку акцентуатора в фоне, если ударения не выключены явно."""
+    global _ACCENT_STATE, _ACCENT_STARTED
+    if _ACCENT_STARTED:
+        return _ACCENT_STATE == "loading"
+    _ACCENT_STARTED = True
+    wanted = os.environ.get("DSH_VOICE_STRESS", "1").strip().lower()
+    if wanted in _STRESS_DISABLE:
+        _ACCENT_STATE = "off"
+        return False
+    _ACCENT_STATE = "loading"
+    threading.Thread(target=_load_accent, name="accent", daemon=True).start()
+    return True
+
+
+def _load_accent() -> None:
+    """Загрузить ruaccent. Медленно, поэтому только в фоне и молча: неудача не ломает чтение."""
+    global _ACCENT, _ACCENT_STATE
+    try:
+        from ruaccent import RUAccent
+
+        accent = RUAccent()
+        accent.load(omograph_model_size="tiny", use_dictionary=True, device="CPU")
+        _ACCENT = accent
+        _ACCENT_STATE = "ready"
+        log_line("ruaccent загружен: ударения расставляются")
+    except Exception as error:  # noqa: BLE001
+        _ACCENT = None
+        _ACCENT_STATE = "unavailable"
+        log_line(f"ruaccent не поднялся ({type(error).__name__}): текст идёт без пометок ударения")
+
+
+def log_line(message: str) -> None:
+    """Строка в журнал голосового процесса: тот же вид, что у остальных его сообщений."""
+    import time
+
+    sys.stderr.write(f"{time.strftime('%H:%M:%S')} {message}\n")
+    sys.stderr.flush()
+
+
+def stress_marks(text: str) -> str:
+    """Поставить ударения, если акцентуатор включён и уже загружен. Иначе текст как есть."""
+    if _ACCENT_STATE != "ready" or _ACCENT is None or text.strip() == "":
+        return text
+    try:
+        return _ACCENT.process_all(text)  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        return text
+
 
 UNITS = ["ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
 UNITS_FEMALE = ["ноль", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
@@ -348,7 +414,11 @@ def prepare(text: str) -> str:
                 and re.search(r"[\wА-Яа-я]$", joined) and re.match(r"^[\wА-Яа-я]", piece)):
             joined += " "
         joined += piece
-    return re.sub(r"[ \t]{2,}", " ", joined)
+    prepared = re.sub(r"[ \t]{2,}", " ", joined)
+    # УДАРЕНИЯ ПОСЛЕДНИМ ШАГОМ. Раньше нельзя: готовый нормализатор и наши правила работают с
+    # текстом, а пометка «+» для них чужой знак. Дальше текст идёт прямо в синтез.
+    start_stress_loading()
+    return stress_marks(prepared)
 
 
 def selftest() -> int:
@@ -400,6 +470,20 @@ def selftest() -> int:
         print(f"{'ПРОШЛО' if clean else 'ПРОВАЛ'}  без цифр и латиницы: {source!r}")
         print(f"        звучит: {got!r}")
     total = len(exact) + len(properties)
+    # УДАРЕНИЯ: пока акцентуатор грузится или его нет, текст обязан уйти без пометок. Состояние
+    # выставляем сами: проверка не должна зависеть от того, успел ли фон загрузить модель.
+    global _ACCENT_STATE
+    saved = _ACCENT_STATE
+    _ACCENT_STATE = "loading"
+    quiet = "+" not in prepare("Он стоит дорого.")
+    _ACCENT_STATE = "unavailable"
+    passthrough = stress_marks("Он стоит дорого.") == "Он стоит дорого."
+    _ACCENT_STATE = saved
+    for title, ok in (("пока акцентуатор грузится, пометок нет", quiet),
+                      ("без акцентуатора текст уходит без пометок", passthrough)):
+        failed += 0 if ok else 1
+        total += 1
+        print(f"{'ПРОШЛО' if ok else 'ПРОВАЛ'}  {title}")
     print(f"\nпроверок: {total}, провалов: {failed}")
     return 1 if failed else 0
 

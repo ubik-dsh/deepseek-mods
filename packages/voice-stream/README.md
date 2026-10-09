@@ -32,6 +32,10 @@ needed).
 | `runtime/INSTALL.ru.md` | installation on another machine |
 | `runtime/SKILL.md` | porting to another language or engine |
 
+**Word stress.** The voice places it itself and errs on homographs (`за́мок` castle against `замо́к`
+lock). Install `pip install ruaccent` and the reader marks the stress with `+`, which the voice
+understands; it is on by default, and without `ruaccent` everything works exactly as before.
+
 ## What it fixes
 
 The first reader (`_voice\dsh_voice.mjs`) watched the session log, and the log only receives
