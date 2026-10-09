@@ -472,6 +472,39 @@ async function main() {
     selftestCount === null ? selftestOut.trim().split('\n').slice(-3).join(' | ') : `${selftestCount[1]} проверок`)
   rmSync(stateDir, { recursive: true, force: true })
 
+  // --- 4ж. осмысленные объявления о работе ------------------------------------
+  // Оператор просил вместо «смотрю» и «понял, работаю» коротко говорить, что делается:
+  // «читаю файл», «ищу по коду», «выполняю команду».
+  check('инструменты называют себя по-русски и коротко',
+    module.describeAction('read') === 'Читаю файл'
+    && module.describeAction('grep') === 'Ищу по коду'
+    && module.describeAction('pwsh') === 'Выполняю команду'
+    && module.describeAction('edit') === 'Правлю файл',
+    ['read', 'grep', 'pwsh', 'edit'].map((one) => module.describeAction(one)).join(' / '))
+  check('незнакомый инструмент не выдумывает фразу',
+    module.describeAction('что-то-новое') === 'Выполняю шаг'
+    && module.describeAction('') === 'Выполняю шаг',
+    module.describeAction('что-то-новое'))
+
+  const actionVoice = new module.VoiceStream(tickConfig, () => {})
+  const actionSent = []
+  actionVoice.child = { stdin: { writable: true, write: (line) => actionSent.push(JSON.parse(line)) } }
+  check('фраза о работе звучит один раз, а не подряд',
+    actionVoice.action('Читаю файл') === true && actionSent.length === 1,
+    `отправлено ${String(actionSent.length)}`)
+  actionVoice.lastActionAt = Date.now() - 4000
+  check('ту же фразу не повторяем чаще, чем разрешено',
+    actionVoice.action('Читаю файл') === false && actionSent.length === 1,
+    `отправлено ${String(actionSent.length)}`)
+  check('а другую фразу о работе говорим сразу',
+    actionVoice.action('Ищу по коду') === true && actionSent.length === 2,
+    JSON.stringify(actionSent[1] ?? null))
+  actionVoice.config.announceActions = false
+  actionVoice.lastActionAt = 0
+  check('объявления выключаются настройкой',
+    actionVoice.action('Выполняю команду') === false && actionSent.length === 2,
+    'выключено')
+
   // --- 5. браузерная половина --------------------------------------------------
   let bundle = null
   globalThis.window = { __ModuleLoader__: { load: (definition) => { bundle = definition } } }

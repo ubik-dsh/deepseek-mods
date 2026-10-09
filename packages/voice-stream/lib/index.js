@@ -72,11 +72,24 @@ export const DEFAULTS = {
    * подводки запрещены, даже если ход почему-то не закрылся.
    */
   workQuietMs: 12000,
+  /**
+   * Объявлять ли, чем занят агент: «Читаю файл», «Ищу по коду», «Выполняю команду».
+   *
+   * Оператор попросил заменить бессмысленные подводки на осмысленные: он хочет слышать, что
+   * происходит, а не «смотрю» и «понял, работаю». Объявления идут синтезом (они разные), но
+   * короткие: две-четыре секунды на фразу.
+   */
+  announceActions: true,
+  /** Не чаще одной фразы о действии в это время: иначе получается болтовня. */
+  actionGapMs: 3000,
+  /** Одну и ту же фразу не повторять чаще, чем раз в это время. */
+  actionRepeatMs: 15000,
+  /** Сколько думать молча, прежде чем сказать «обдумываю». */
+  thinkingAfterMs: 4000,
 }
 
 /** Message of an unknown thrown value. */
-function messageOf(error) {
-  return error instanceof Error ? error.message : String(error)
+function messageOf(error) {  return error instanceof Error ? error.message : String(error)
 }
 
 /** Русское окончание после числа: 1 секунду, 2 секунды, 5 секунд. */
@@ -170,6 +183,44 @@ export function takePiece(text, { min, limit }) {
   return { text: text.slice(0, consumed).trim(), consumed }
 }
 
+/**
+ * Короткая русская фраза о том, что делает инструмент.
+ *
+ * Оператор: «у тебя есть шаги — читаешь файл, ищешь код, выполняешь команды; может, это кратенько
+ * описывать, чтобы было постоянное понимание, что сейчас происходит». Здесь только название
+ * действия: два-четыре слова, которые успевают прозвучать, пока инструмент работает. Незнакомый
+ * инструмент не выдумываем: говорим «выполняю шаг», чтобы не обещать того, чего не знаем.
+ *
+ * @param name - имя инструмента из кадра потока.
+ * @returns фраза для голоса.
+ */
+export function describeAction(name) {
+  const table = {
+    read: 'Читаю файл',
+    write: 'Пишу файл',
+    edit: 'Правлю файл',
+    grep: 'Ищу по коду',
+    glob: 'Ищу файлы',
+    list: 'Смотрю каталог',
+    pwsh: 'Выполняю команду',
+    bash: 'Выполняю команду',
+    job_output: 'Читаю вывод задачи',
+    todo_write: 'Веду план',
+    subagent: 'Запускаю подагента',
+    subagent_fork: 'Запускаю подагента',
+    workflow: 'Запускаю поток задач',
+    web_search: 'Ищу в интернете',
+    web_fetch: 'Открываю страницу',
+    ask_user_question: 'Спрашиваю',
+    skill: 'Открываю навык',
+    present: 'Показываю файл',
+    create_goal: 'Ставлю цель',
+    update_goal: 'Обновляю цель',
+  }
+  if (typeof name !== 'string' || name.trim() === '') return 'Выполняю шаг'
+  return table[name] ?? 'Выполняю шаг'
+}
+
 /** Один тёплый голосовой процесс на все ответы. */
 export class VoiceStream {
   constructor(config, onLog = () => {}) {
@@ -195,6 +246,13 @@ export class VoiceStream {
     this.turn = null
     /** Когда пришёл последний кадр потока: по нему такт понимает, идёт ли работа вообще. */
     this.lastFrameAt = 0
+    /** Объявления о действиях: когда говорили последний раз и что именно. */
+    this.lastActionAt = 0
+    this.lastActionPhrase = null
+    /** Номер последнего вызова инструмента и начало размышления: чтобы объявлять по разу. */
+    this.lastCallId = null
+    this.thinkingSince = 0
+    this.announcedThinking = false
     this.fillersPlayed = 0
     this.lastSpokenAt = 0
     this.lastFillerAt = 0
@@ -450,6 +508,29 @@ export class VoiceStream {
     this.send({ command: 'filler', id, which })
   }
 
+  /**
+   * Сказать, чем занят: «Читаю файл», «Ищу по коду», «Обдумываю».
+   *
+   * ЧАСТОТА ЗДЕСЬ ГЛАВНОЕ. Осмысленная фраза полезна, а поток фраз — та же болтовня, только
+   * умнее. Поэтому: не чаще одной фразы в `actionGapMs` и не чаще повтора одной и той же фразы
+   * в `actionRepeatMs`. Признак `announceActions` выключает объявления целиком.
+   *
+   * @param phrase - короткая фраза для голоса.
+   * @returns сказали ли.
+   */
+  action(phrase) {
+    if (this.config.announceActions !== true) return false
+    if (typeof phrase !== 'string' || phrase.trim() === '') return false
+    const now = Date.now()
+    if (now - this.lastActionAt < this.config.actionGapMs) return false
+    if (phrase === this.lastActionPhrase && now - this.lastActionAt < this.config.actionRepeatMs) return false
+    this.lastActionAt = now
+    this.lastActionPhrase = phrase
+    this.onLog(`voice-stream: объявляю действие: ${phrase}`)
+    this.say(phrase)
+    return true
+  }
+
   /** Сказать служебную фразу, которую нужно синтезировать: например про ожидание. */
   announce(text) {
     if (typeof text !== 'string' || text.trim() === '') return
@@ -703,6 +784,9 @@ export function apply(ctx, rawConfig) {
       voice.lastFrameAt = Date.now()
       if (voice.turn !== frame.turn) {
         voice.startTurn(frame.turn)
+        voice.lastCallId = null
+        voice.thinkingSince = 0
+        voice.announcedThinking = false
         toolArguments = ''
         announcedWaits = new Set()
         if (config.fillers) voice.filler(1)
@@ -720,7 +804,24 @@ export function apply(ctx, rawConfig) {
         voice.lastSpokenAt = Date.now()
         return
       }
+      // ДОЛГОЕ РАЗМЫШЛЕНИЕ СТОИТ НАЗВАТЬ. Первые секунды молчания закрывает подводка из кэша,
+      // но когда анализ идёт долго, человек хочет знать, что это анализ, а не зависание.
+      if (chunk?.type === 'reasoning-delta' && typeof chunk.text === 'string' && chunk.text.trim() !== '') {
+        if (voice.thinkingSince === 0) voice.thinkingSince = Date.now()
+        if (!voice.announcedThinking && Date.now() - voice.thinkingSince > voice.config.thinkingAfterMs) {
+          voice.announcedThinking = true
+          voice.action('Обдумываю задачу')
+        }
+        return
+      }
       if (chunk?.type === 'tool-call-delta' && typeof chunk.argumentsDelta === 'string') {
+        // ИМЯ ИНСТРУМЕНТА ПРИХОДИТ В ПЕРВОМ КАДРЕ ВЫЗОВА, и по нему мы говорим, чем заняты:
+        // «Читаю файл», «Ищу по коду», «Выполняю команду». Оператор просил именно это вместо
+        // бессмысленных «смотрю» и «понял, работаю».
+        if (typeof chunk.name === 'string' && chunk.id !== voice.lastCallId) {
+          voice.lastCallId = chunk.id
+          voice.action(describeAction(chunk.name))
+        }
         // Аргументы приходят по кускам. Собираем и смотрим, не назначена ли пауза:
         // «подождём 59 секунд» говорится ДО ожидания, поэтому её надо назвать заранее.
         toolArguments += chunk.argumentsDelta
