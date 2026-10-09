@@ -103,16 +103,38 @@ window.__ModuleLoader__.load({
 
 			react.useEffect(() => {
 				let alive = true;
-				callHost("GET").then(
-					(snapshot) => {
-						if (alive) setState(snapshot);
-					},
-					(failure) => {
-						if (alive) setError(messageOf(failure));
-					},
-				);
+				/**
+				 * КНОПКА НЕ ДОЛЖНА ОСТАВАТЬСЯ СТАРОЙ.
+				 *
+				 * Оператор отошёл, ответ прозвучал без него, вернулся — и «Повторить» была серой,
+				 * хотя харнесс честно отвечал `hasLast: true`. Причина: снимок состояния читался
+				 * ОДИН РАЗ при отрисовке и больше никогда, поэтому кнопка жила тем, что было при
+				 * открытии страницы. Теперь снимок обновляется сам: раз в пять секунд и сразу,
+				 * когда окно снова становится видимым или получает фокус — то есть ровно тогда,
+				 * когда человек вернулся к экрану.
+				 */
+				const refresh = () => {
+					callHost("GET").then(
+						(snapshot) => {
+							if (alive) setState(snapshot);
+						},
+						(failure) => {
+							if (alive) setError(messageOf(failure));
+						},
+					);
+				};
+				refresh();
+				const timer = setInterval(refresh, 5000);
+				const onVisible = () => {
+					if (typeof document === "undefined" || document.visibilityState === "visible") refresh();
+				};
+				if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+				if (typeof window !== "undefined") window.addEventListener("focus", onVisible);
 				return () => {
 					alive = false;
+					clearInterval(timer);
+					if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+					if (typeof window !== "undefined") window.removeEventListener("focus", onVisible);
 				};
 			}, []);
 

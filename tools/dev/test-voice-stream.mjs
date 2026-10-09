@@ -550,12 +550,34 @@ async function main() {
     `повторов подряд ${String(backToBack)}, разных ${String(distinctFillers)} `
     + `из ${String(module.START_FILLERS.length)}`)
 
+  // --- 4к. короткий отрывок не затирает настоящий ответ ------------------------
+  // Внутренние продолжения хода дают мало текста и раньше переписывали «последний ответ»: кнопка
+  // предлагала повторить огрызок вместо того ответа, который человек пропустил.
+  const answerVoice = new module.VoiceStream(tickConfig, () => {})
+  answerVoice.collected = 'Это настоящий длинный ответ, который человек пропустил и хочет услышать снова.'
+  answerVoice.finishTurn()
+  const longAnswer = answerVoice.lastAnswer
+  answerVoice.collected = 'Хм.'
+  answerVoice.finishTurn()
+  check('короткий отрывок не затирает настоящий ответ для повтора',
+    longAnswer.length > 40 && answerVoice.lastAnswer === longAnswer && answerVoice.hasLast,
+    `осталось знаков: ${String(answerVoice.lastAnswer.length)}`)
+
   // --- 5. браузерная половина --------------------------------------------------
   let bundle = null
   globalThis.window = { __ModuleLoader__: { load: (definition) => { bundle = definition } } }
   await import(pathToFileURL(join(PACKAGE, 'lib', 'client.js')).href)
   check('браузерная половина зарегистрирована под именем пакета',
     bundle?.id === '@local/dsh-voice-stream', bundle?.id ?? 'не загрузилась')
+
+  // КНОПКА «ПОВТОРИТЬ» БЫЛА СЕРОЙ, ХОТЯ ХАРНЕСС ОТВЕЧАЛ hasLast: true. Оператор отошёл, ответ
+  // прозвучал без него, вернулся — и повторить было нечем: снимок состояния читался один раз при
+  // отрисовке. Проверяем, что теперь он обновляется сам и по возвращению к окну.
+  const clientText = readFileSync(join(PACKAGE, 'lib', 'client.js'), 'utf8')
+  check('состояние кнопки обновляется само, а не только при отрисовке',
+    clientText.includes('setInterval(refresh') && clientText.includes('visibilitychange')
+    && clientText.includes('addEventListener("focus"'),
+    clientText.includes('setInterval(refresh') ? 'обновление по таймеру и по возвращению к окну' : 'обновления нет')
 
   const fakeReact = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {} }
   const client = bundle.factory((name) => {
