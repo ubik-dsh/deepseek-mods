@@ -436,6 +436,31 @@ async function main() {
     panelSource.includes('voiceError') && panelSource.includes('голос недоступен'),
     panelSource.includes('voiceError') ? 'состояние и подпись на месте' : 'поля voiceError нет')
 
+  // --- 4е. подводки молчат, когда работы нет --------------------------------
+  // Оператор услышал «понял, работаю» и «работаю, подожди» уже после того, как ответ кончился:
+  // ход не закрывался, и такт продолжал болтать в пустой комнате. Проверяем оба предохранителя.
+  const tickConfig = module.validateConfig({ streamPath: join(PACKAGE, 'runtime', 'say_stream.py') })
+  const tickVoice = new module.VoiceStream(tickConfig, () => {})
+  const tickSent = []
+  tickVoice.child = { stdin: { writable: true, write: (line) => tickSent.push(JSON.parse(line)) } }
+  tickVoice.startTurn(7)
+  tickVoice.lastSpokenAt = 0
+  tickVoice.lastFillerAt = 0
+  tickVoice.lastFrameAt = Date.now() - 60000
+  check('без свежих кадров подводка не звучит',
+    tickVoice.tick() === 'кадров нет: молчу' && tickSent.length === 0,
+    `${tickVoice.tick()} , отправлено ${String(tickSent.length)}`)
+  tickVoice.lastFrameAt = Date.now()
+  check('пока кадры идут, подводка звучит',
+    tickVoice.tick() === 'сказал' && tickSent.length === 1,
+    `отправлено ${String(tickSent.length)}: ${JSON.stringify(tickSent[0] ?? null)}`)
+  tickVoice.finishTurn()
+  tickVoice.lastSpokenAt = 0
+  tickVoice.lastFillerAt = 0
+  check('после конца хода такт молчит, даже если время прошло',
+    tickVoice.tick() === 'нет хода' && tickSent.length === 1,
+    `${tickVoice.tick()} , отправлено ${String(tickSent.length)}`)
+
   // ВЫБОР ПРОИГРЫВАТЕЛЯ. Платформенную ветку нельзя проверить «своим» запуском, поэтому она
   // вынесена в чистую функцию с подменяемым поиском, а здесь мы гоняем её для всех платформ.
   const selftest = spawnSync(module.resolveInterpreter({}).command,

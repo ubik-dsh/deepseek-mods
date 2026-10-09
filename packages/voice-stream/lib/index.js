@@ -65,6 +65,13 @@ export const DEFAULTS = {
   workRepeatMs: 30000,
   /** Сколько подводок на один ход: дальше это уже болтовня. */
   maxFillersPerTurn: 4,
+  /**
+   * Сколько тишины в потоке считать остановкой работы.
+   *
+   * Это предохранитель от болтовни в пустоту: если кадров из потока нет дольше этого времени,
+   * подводки запрещены, даже если ход почему-то не закрылся.
+   */
+  workQuietMs: 12000,
 }
 
 /** Message of an unknown thrown value. */
@@ -186,6 +193,8 @@ export class VoiceStream {
     this.idle = null
     /** Текущий ход и учёт подводок: тишину заполняем, но не болтаем. */
     this.turn = null
+    /** Когда пришёл последний кадр потока: по нему такт понимает, идёт ли работа вообще. */
+    this.lastFrameAt = 0
     this.fillersPlayed = 0
     this.lastSpokenAt = 0
     this.lastFillerAt = 0
@@ -248,6 +257,10 @@ export class VoiceStream {
   finishTurn() {
     if (this.collected.trim() !== '') this.lastAnswer = this.collected
     this.collected = ''
+    // ХОД ЗАКРЫВАЕТСЯ, И ЭТО ГЛАВНОЕ. Раньше здесь не сбрасывался `turn`, поэтому после первого
+    // ответа такт считал, что работа продолжается, и подводки звучали в пустой комнате.
+    this.turn = null
+    this.lastFrameAt = 0
   }
 
   /** Есть ли что повторять. */
@@ -447,6 +460,7 @@ export class VoiceStream {
   /** Начался новый ход: считаем подводки заново, копилку текста чистим. */
   startTurn(turn) {
     this.turn = turn
+    this.lastFrameAt = Date.now()
     this.fillersPlayed = 0
     this.lastSpokenAt = Date.now()
     this.lastFillerAt = 0
@@ -462,8 +476,14 @@ export class VoiceStream {
    */
   tick() {
     if (this.turn === null) return 'нет хода'
-    if (this.fillersPlayed >= this.config.maxFillersPerTurn) return 'лимит подводок'
+    // ТИШИНА ЗНАЧИТ ТИШИНА. Оператор услышал «понял, работаю» и «работаю, подожди» уже после того,
+    // как ответ кончился и работа встала: ход не закрывался, и такт продолжал болтать. Теперь
+    // подводка возможна только пока из потока идут кадры: нет кадров давно — нет и слов.
     const now = Date.now()
+    if (this.lastFrameAt === 0 || now - this.lastFrameAt > this.config.workQuietMs) {
+      return 'кадров нет: молчу'
+    }
+    if (this.fillersPlayed >= this.config.maxFillersPerTurn) return 'лимит подводок'
     if (now - this.lastSpokenAt < this.config.workAfterMs) return 'рано'
     if (now - this.lastFillerAt < this.config.workRepeatMs) return 'недавно говорил'
     // Разные подводки по очереди: 5 «понял, работаю», 9 «работаю, подожди», 7 «ещё немного».
@@ -680,6 +700,7 @@ export function apply(ctx, rawConfig) {
     if (frame.type === 'start') {
       // Новый ход: заводим счётчики и сразу говорим короткую подводку из кэша, чтобы
       // тишина не висела, пока модель думает и пока идут инструменты.
+      voice.lastFrameAt = Date.now()
       if (voice.turn !== frame.turn) {
         voice.startTurn(frame.turn)
         toolArguments = ''
@@ -691,6 +712,7 @@ export function apply(ctx, rawConfig) {
     }
     if (frame.type === 'chunk') {
       const chunk = frame.chunk
+      voice.lastFrameAt = Date.now()
       // Читаем ровно видимый ответ: размышления и вызовы инструментов вслух не нужны.
       if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') {
         voice.feed(chunk.text)
