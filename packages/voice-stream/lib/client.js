@@ -153,12 +153,22 @@ window.__ModuleLoader__.load({
 			 * причину словами, а не молчит.
 			 */
 			const staleHost = state !== null && state.hasLast === undefined;
-			const label = on === null ? "Голос…" : on ? "Голос: вкл" : "Голос: выкл";
-			const title = on === null
-				? "Состояние голоса не прочитано"
-				: on
-					? "Ответы читаются вслух. Нажми, чтобы выключить звук."
-					: "Ответы читаются только глазами. Нажми, чтобы включить звук.";
+			/**
+			 * ГОЛОС МОЖЕТ БЫТЬ НЕДОСТУПЕН, И ОБ ЭТОМ НАДО СКАЗАТЬ. Хост шлёт причину в поле
+			 * `voiceError`: не найден питон, не поднялся процесс. Раньше в этом случае кнопка
+			 * выглядела рабочей, человек включал голос и не слышал ничего без объяснений.
+			 */
+			const voiceError = typeof state?.voiceError === "string" && state.voiceError !== "" ? state.voiceError : null;
+			const label = voiceError !== null
+				? "Голос: недоступен"
+				: on === null ? "Голос…" : on ? "Голос: вкл" : "Голос: выкл";
+			const title = voiceError !== null
+				? `Голос не работает: ${voiceError}`
+				: on === null
+					? "Состояние голоса не прочитано"
+					: on
+						? "Ответы читаются вслух. Нажми, чтобы выключить звук."
+						: "Ответы читаются только глазами. Нажми, чтобы включить звук.";
 			const repeatTitle = staleHost
 				? "Хост в памяти старой сборки: перезапусти dsh web, иначе повторять нечем"
 				: canRepeat
@@ -186,6 +196,9 @@ window.__ModuleLoader__.load({
 				staleHost
 					? react.createElement("span", { style: styles.error, title: repeatTitle }, "нужен перезапуск dsh web")
 					: null,
+				voiceError === null
+					? null
+					: react.createElement("span", { style: styles.error, title: `Голос не работает: ${voiceError}` }, "голос недоступен"),
 				notice === null ? null : react.createElement("span", { style: styles.error }, notice),
 				error === null ? null : react.createElement("span", { style: styles.error, title: error }, "нет связи"),
 			);
