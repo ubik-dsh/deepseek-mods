@@ -169,6 +169,17 @@ export class VoiceStream {
     this.config = config
     this.onLog = onLog
     this.child = null
+    /**
+     * Почему голос молчит, если молчит.
+     *
+     * Раньше сбой запуска процесса (нет питона, нет прав) был виден только в консоли харнесса,
+     * а в панели кнопка выглядела рабочей: человек включал голос и не слышал ничего, без причины.
+     * Теперь причина хранится здесь и уезжает в панель вместе со снимком состояния.
+     */
+    this.lastError = null
+    /** До какого времени не пытаться снова: без этого каждая фраза рождала новый сбойный запуск. */
+    this.retryAfter = 0
+    this.startFailures = 0
     this.buffer = ''
     this.nextId = 1
     this.spoken = 0
@@ -187,6 +198,15 @@ export class VoiceStream {
      */
     this.collected = ''
     this.lastAnswer = ''
+    // ПИТОНА МОЖЕТ НЕ БЫТЬ ВОВСЕ (Ubuntu без python3, чужой профиль без PATH). Тогда не пытаемся
+    // запускать процесс ни разу: причина записана, кнопка её покажет, и харнесс работает дальше.
+    if (config.pythonMissing === true) {
+      this.lastError = config.pythonReason !== undefined
+        ? `голос недоступен: ${config.pythonReason}`
+        : `не найден ${config.pythonPath} — поставьте Python 3.11+ `
+          + '(в Ubuntu: sudo apt install python3) или задайте DSH_VOICE_PYTHON'
+      this.retryAfter = Number.POSITIVE_INFINITY
+    }
   }
 
   /**
@@ -252,13 +272,25 @@ export class VoiceStream {
 
   start() {
     if (this.child !== null) return
+    // ПОВТОРЫ НЕ КОПЯТСЯ. Если питона нет, каждый кусок ответа порождал бы новый сбойный запуск:
+    // сотни попыток за один ответ. После сбоя ждём, а после «интерпретатора нет вовсе» не
+    // пытаемся больше ни разу — это ждёт человека, а не времени.
+    if (Date.now() < this.retryAfter) return
     const args = [this.config.streamPath, '--max-total', String(this.config.maxChars)]
     this.onLog(`voice-stream: поднимаю голос: ${this.config.pythonPath} ${args.join(' ')}`)
-    const child = spawn(this.config.pythonPath, args, {
-      stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },
-    })
+    let child = null
+    try {
+      child = spawn(this.config.pythonPath, args, {
+        stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },
+      })
+    } catch (error) {
+      // `spawn` бросает синхронно на неверных аргументах; `ENOENT` приходит событием ниже.
+      this.noteStartFailure(null, error)
+      return
+    }
     this.child = child
+    this.lastError = null
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk) => {
       for (const line of String(chunk).split(/\r?\n/u)) {
@@ -288,10 +320,38 @@ export class VoiceStream {
       this.onLog(`voice-stream: вход голосового процесса оборвался (${messageOf(error)})`)
       if (this.child === child) this.child = null
     })
+    // ЗАПУСК ПРОЦЕССА ТОЖЕ МОЖЕТ НЕ СОСТОЯТЬСЯ, И ЭТО НЕ ПОВОД РОНЯТЬ ХАРНЕСС. Без обработчика
+    // `'error'` у ChildProcess становится `uncaughtException` и завершает процесс целиком: на
+    // Ubuntu 24.04 установка плагина давала `dsh: fatal uncaught exception: Error: spawn python
+    // ENOENT`, и падал весь `dsh web`. Случай `EPIPE` ниже был закрыт, случай «процесса нет» — нет.
+    child.on('error', (error) => {
+      this.noteStartFailure(child, error)
+    })
     child.on('close', (code) => {
       if (this.child === child) this.child = null
       this.onLog(`voice-stream: голосовой процесс закрылся (код ${code})`)
     })
+  }
+
+  /**
+   * Запомнить, что голос не поднялся: причину для кнопки и паузу для повторов.
+   *
+   * @param child - процесс, который не поднялся (может быть null при синхронном отказе).
+   * @param error - ошибка запуска.
+   */
+  noteStartFailure(child, error) {
+    if (child === null || this.child === child) this.child = null
+    this.startFailures += 1
+    const reason = messageOf(error)
+    this.lastError = `голос не поднялся: ${reason}`
+    // ENOENT значит «интерпретатора нет вовсе»: повторять каждую фразу бессмысленно, а иногда и
+    // вредно (сто попыток запуска на один ответ). Ждём человека, а не времени.
+    const waitMs = error?.code === 'ENOENT' ? Number.POSITIVE_INFINITY : 5000
+    this.retryAfter = waitMs === Number.POSITIVE_INFINITY ? waitMs : Date.now() + waitMs
+    const waitText = waitMs === Number.POSITIVE_INFINITY
+      ? 'повторю только после правки настроек'
+      : `следующая попытка через ${Math.round(waitMs / 1000)} с`
+    this.onLog(`voice-stream: ${this.lastError} (${waitText})`)
   }
 
   /**
@@ -433,6 +493,73 @@ export class VoiceStream {
 }
 
 /**
+ * Имена интерпретатора по умолчанию, в порядке предпочтения.
+ *
+ * НА UBUNTU НЕТ КОМАНДЫ `python`. Debian и Ubuntu поставляют только `python3`, и `spawn('python')`
+ * падает там с `ENOENT`: плагин, который «работает на Windows», на Linux не запускался вовсе.
+ * Поэтому имён два, и порядок зависит от платформы.
+ *
+ * @param platform - `process.platform`.
+ * @returns имена для поиска в PATH, лучшее первым.
+ */
+export function defaultPythonNames(platform = process.platform) {
+  return platform === 'win32' ? ['python', 'python3'] : ['python3', 'python']
+}
+
+/**
+ * Найти команду в PATH: полный путь или `null`.
+ *
+ * Расширения проверяем тоже: на Windows `python` лежит как `python.exe`, и без PATHEXT поиск не
+ * нашёл бы ничего. Пустые каталоги пропускаем: пустой элемент PATH значит текущий каталог, а искать
+ * интерпретатор в текущем каталоге небезопасно.
+ *
+ * @param command - имя команды.
+ * @param env - окружение, откуда берём PATH.
+ * @param platform - платформа, чтобы знать разделитель и расширения.
+ * @returns путь к найденному файлу или null.
+ */
+export function findOnPath(command, env = process.env, platform = process.platform) {
+  const separator = platform === 'win32' ? ';' : ':'
+  const extensions = platform === 'win32'
+    ? String(env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').filter((item) => item !== '')
+    : ['']
+  for (const directory of String(env.PATH ?? env.Path ?? '').split(separator)) {
+    if (directory.trim() === '') continue
+    for (const extension of ['', ...extensions]) {
+      const candidate = join(directory, command + extension)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  return null
+}
+
+/**
+ * Какой питон запускать.
+ *
+ * Явно заданное (`pythonPath` в строке загрузчика или `DSH_VOICE_PYTHON`) не переопределяем
+ * никогда: человек сказал — значит сказал. Если не задано, ищем по платформе и говорим, что нашли.
+ * Когда не нашли ничего, возвращаем имя первого кандидата и признак `missing`: плагин должен
+ * отказать словами, а не молчанием.
+ *
+ * @param options - `configured` из настроек, окружение и платформа.
+ * @returns команда, объяснение и признак «не найден».
+ */
+export function resolveInterpreter({ configured = '', env = process.env, platform = process.platform } = {}) {
+  const explicit = String(configured ?? '').trim() || String(env.DSH_VOICE_PYTHON ?? '').trim()
+  if (explicit !== '') return { command: explicit, source: 'задано настройкой или DSH_VOICE_PYTHON' }
+  const names = defaultPythonNames(platform)
+  for (const name of names) {
+    const found = findOnPath(name, env, platform)
+    if (found !== null) return { command: found, source: `нашёл ${name} в PATH` }
+  }
+  return {
+    command: names[0],
+    source: `не найден ни ${names.join(', ни ')}`,
+    missing: true,
+  }
+}
+
+/**
  * Настройки, которые нельзя записать в опубликованный слой.
  *
  * ПЛАГИН-СЛОЙ НЕ МОЖЕТ НЕСТИ МАШИННЫЕ ПУТИ. Пока пакет ставился своим установщиком, слой писал
@@ -451,10 +578,6 @@ export function validateConfig(raw) {
     config.streamPath = config.streamPath || process.env.DSH_VOICE_STREAM
       || join(packageRoot, 'runtime', 'say_stream.py')
   }
-  if (typeof config.pythonPath !== 'string' || config.pythonPath.trim() === '') {
-    // Имя без разделителей это поиск в PATH: так работает пустая настройка на новой машине.
-    config.pythonPath = config.pythonPath || process.env.DSH_VOICE_PYTHON || 'python'
-  }
   if (!isAbsolute(config.streamPath)) {
     throw new Error(`voice-stream: streamPath must be absolute: ${String(config.streamPath)}`)
   }
@@ -463,15 +586,29 @@ export function validateConfig(raw) {
       + 'Ожидается файл runtime/say_stream.py внутри установленного пакета; если путь задан '
       + 'настройкой, проверьте его.')
   }
-  const python = String(config.pythonPath)
+  // ОТСУТСТВИЕ ПИТОНА ЭТО НЕ ОШИБКА НАСТРОЙКИ. Раньше здесь выбиралось между «`python` в PATH» и
+  // падением, и пустая настройка на Ubuntu приводила к `spawn python ENOENT`, который валил весь
+  // харнесс. Теперь плагин поднимается всегда, а отказывает только голос: словами и с причиной.
+  const resolved = resolveInterpreter({ configured: config.pythonPath })
+  const python = String(resolved.command)
   const looksLikePath = /[\\/]/u.test(python)
-  if (looksLikePath && !isAbsolute(python)) {
+  let missing = resolved.missing === true
+  let reason = resolved.source
+  if (!missing && looksLikePath && !isAbsolute(python)) {
+    // Относительный путь с разделителем (`./venv/bin/python`) это всегда опечатка.
     throw new Error(`voice-stream: pythonPath must be absolute: ${python}`)
   }
-  if (looksLikePath && !existsSync(python)) {
-    throw new Error(`voice-stream: pythonPath does not exist: ${python}`)
+  if (!missing && looksLikePath && !existsSync(python)) {
+    // ПУТЬ ЗАДАН, НО ЕГО НЕТ. Это не ошибка настройки, а отсутствие голоса: плагин обязан
+    // подняться, чтобы кнопка в панели сказала человеку причину. Раньше здесь было исключение —
+    // и при `DSH_VOICE_PYTHON=/nonexistent` мод не поднимался вовсе, вместе с кнопкой.
+    missing = true
+    reason = `заданный путь не существует: ${python}`
   }
   config.pythonPath = python
+  config.pythonSource = reason
+  config.pythonMissing = missing
+  if (missing) config.pythonReason = reason
   return config
 }
 
@@ -517,6 +654,12 @@ export function apply(ctx, rawConfig) {
     if (ctx.logger?.debug !== undefined) ctx.logger.debug(line)
     else console.log(line)
   })
+  // ЧТО НАШЛИ, ТЕМ И ГОВОРИМ. Человек должен видеть в журнале, каким питоном плагин собирается
+  // читать, и почему не будет — до того, как решит, что «голос сломан».
+  ctx.logger?.info?.(`voice-stream: питон для голоса: ${config.pythonPath} (${config.pythonSource ?? 'задано'})`)
+  if (config.pythonMissing === true) {
+    ctx.logger?.warn?.(`voice-stream: ${voice.lastError}. Плагин работает, чтение вслух — нет.`)
+  }
 
   /**
    * Читаем только ведущий агент: у подагентов свои сеансы, и их переписка вслух
@@ -607,6 +750,11 @@ export function apply(ctx, rawConfig) {
           hasLast: voice.hasLast,
           lastChars: voice.lastAnswer.length,
           statePath,
+          // ПОЧЕМУ МОЛЧИТ. Кнопка показывает это человеку вместо тишины: «не найден python3 —
+          // поставьте Python 3.11+ или задайте DSH_VOICE_PYTHON».
+          voiceError: voice.lastError,
+          pythonPath: config.pythonPath,
+          pythonSource: config.pythonSource ?? null,
         })
         if (request.method === 'GET') return json(snapshot())
         let payload = null
