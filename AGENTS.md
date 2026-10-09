@@ -55,7 +55,14 @@ are an AI agent working here, read this first.
    (the voice reader declares its downloaded voice model and the pronunciation
    dictionary): the installer copies those paths aside before replacing the folder
    and puts them back file by file, and `check-deployed` stops calling them drift, so
-   nobody deletes a user's model to make a check pass.
+   nobody deletes a user's model to make a check pass. **A bundle-installed plugin is
+   live code, so do not edit it in place while the host is running.** A profile bundle
+   is a symlink into this repository and the host watches its plugin files: changing
+   them under a running host (a branch merge did it) leaves the mod half-disposed. The
+   voice reader stayed alive with its process running, the switch on and no error in
+   any log, and simply stopped being fed, so it went silent while its button still said
+   "on". Nothing said why. Restart `dsh web` after touching a bundle-installed plugin's
+   files.
 6. **Keep both languages in sync.** Every user-facing document exists as
    `X.md` (English) and `X.ru.md` (Russian).
 7. **The skills repository is the source; the installed trees are deployment.**

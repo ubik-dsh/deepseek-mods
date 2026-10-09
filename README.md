@@ -40,6 +40,12 @@ torch. The order is in [packages/voice-stream/runtime/INSTALL.ru.md](packages/vo
 (Russian); the package carries `runtime/получить-голос.py` to fetch the model and `runtime/сказать.py`
 to check it.
 
+**A plugin installed as a bundle is live code, not a copy:** the package is a symlink into this
+repository and the host watches its files. Edit them under a running host (a branch merge did it) and
+the mod is left half-disposed: the voice reader once went silent with its process alive, the switch
+on and no error in any log, and nothing said why. **Restart `dsh web`** after touching a
+bundle-installed plugin's files instead of trusting the hot reload.
+
 ## What is in here
 
 Nine packages live here; the main ones are below. The two bundles (voice reader and Russian pack)
