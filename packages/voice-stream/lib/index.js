@@ -98,6 +98,21 @@ export const DEFAULTS = {
   stress: true,
 }
 
+/**
+ * Номера подводок в кэше голосового процесса — по группам.
+ *
+ * ОПЕРАТОР: «добавь больше синонимов слов-паразитов, а то как-то одно и то же». Номера — это
+ * позиции в списке `FILLERS` файла `say_stream.py`, и порядок там менять нельзя: файлы кэша
+ * названы номерами, а старые номера уже синтезированы. Новые фразы дописываются в конец списка.
+ * Проверка `tools/dev/test-voice-stream.mjs` сверяет, что ни один номер здесь не выходит за
+ * длину списка в питоне: раньше эта связь держалась на памяти.
+ */
+export const START_FILLERS = [0, 1, 2, 3, 4, 10, 11, 12, 13, 16]
+export const WORK_FILLERS = [5, 6, 7, 8, 9, 14, 15]
+
+/** Про размышление: одну и ту же фразу каждый раз слушать надоедает. */
+export const THINKING_PHRASES = ['Обдумываю задачу', 'Думаю над этим', 'Анализирую']
+
 /** Message of an unknown thrown value. */
 function messageOf(error) {  return error instanceof Error ? error.message : String(error)
 }
@@ -263,6 +278,11 @@ export class VoiceStream {
     this.lastCallId = null
     this.thinkingSince = 0
     this.announcedThinking = false
+    this.thinkingPick = 0
+    /** Мешок подводок: пока не кончится, одна и та же фраза не повторяется. */
+    this.bag = []
+    this.bagGroup = null
+    this.lastFillerIndex = -1
     this.fillersPlayed = 0
     this.lastSpokenAt = 0
     this.lastFillerAt = 0
@@ -584,10 +604,39 @@ export class VoiceStream {
     if (this.fillersPlayed >= this.config.maxFillersPerTurn) return 'лимит подводок'
     if (now - this.lastSpokenAt < this.config.workAfterMs) return 'рано'
     if (now - this.lastFillerAt < this.config.workRepeatMs) return 'недавно говорил'
-    // Разные подводки по очереди: 5 «понял, работаю», 9 «работаю, подожди», 7 «ещё немного».
-    const rotation = [5, 7, 9]
-    this.filler(rotation[this.fillersPlayed % rotation.length])
+    // Подводки берём из набора мешком: пока набор не кончится, одна и та же не звучит дважды.
+    this.takeFiller(WORK_FILLERS)
     return 'сказал'
+  }
+
+  /**
+   * Взять подводку из набора так, чтобы одна и та же не звучала подряд.
+   *
+   * Оператор: «а то как-то одно и то же». Поэтому набор перебирается мешком: каждая фраза звучит
+   * по разу, потом мешок наполняется снова, и та же самая, что была последней, не выпадает первой.
+   *
+   * @param group - номера подводок в кэше голосового процесса.
+   * @returns номер, который сказали.
+   */
+  takeFiller(group) {
+    if (this.bagGroup !== group || this.bag.length === 0) {
+      this.bagGroup = group
+      this.bag = [...group]
+    }
+    let slot = Math.floor(Math.random() * this.bag.length)
+    let index = this.bag[slot]
+    if (index === this.lastFillerIndex && this.bag.length > 1) {
+      // Та же фраза, что в прошлый раз: берём другую из мешка, а эту возвращаем на её место.
+      const otherSlot = (slot + 1) % this.bag.length
+      index = this.bag[otherSlot]
+      this.bag[otherSlot] = this.bag[slot]
+      this.bag[slot] = index
+      slot = otherSlot
+    }
+    this.bag.splice(slot, 1)
+    this.lastFillerIndex = index
+    this.filler(index)
+    return index
   }
 
   stop(reason = 'voice-stream: плагин выгружен') {
@@ -804,9 +853,10 @@ export function apply(ctx, rawConfig) {
         voice.lastCallId = null
         voice.thinkingSince = 0
         voice.announcedThinking = false
+        voice.thinkingPick = 0
         toolArguments = ''
         announcedWaits = new Set()
-        if (config.fillers) voice.filler(1)
+        if (config.fillers) voice.takeFiller(START_FILLERS)
       }
       voice.begin()
       return
@@ -827,7 +877,7 @@ export function apply(ctx, rawConfig) {
         if (voice.thinkingSince === 0) voice.thinkingSince = Date.now()
         if (!voice.announcedThinking && Date.now() - voice.thinkingSince > voice.config.thinkingAfterMs) {
           voice.announcedThinking = true
-          voice.action('Обдумываю задачу')
+          voice.action(THINKING_PHRASES[voice.thinkingPick++ % THINKING_PHRASES.length])
         }
         return
       }

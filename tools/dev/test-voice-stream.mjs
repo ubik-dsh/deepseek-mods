@@ -523,6 +523,33 @@ async function main() {
     numbers.status === 0 && numbersCount !== null && numbersCount[2] === '0',
     numbersCount === null ? numbersOut.trim().split('\n').slice(-2).join(' | ') : `${numbersCount[1]} проверок`)
 
+  // --- 4и. подводки: разнообразие и связь с кэшем ------------------------------
+  // Оператор: «добавь больше синонимов слов-паразитов, а то как-то одно и то же». Номера подводок
+  // живут в моде, а сами фразы в голосовом процессе, и связь между ними держалась на памяти.
+  const sayStreamSource = readFileSync(join(PACKAGE, 'runtime', 'say_stream.py'), 'utf8')
+  const fillerBlock = /FILLERS = \[([\s\S]*?)\n\]/u.exec(sayStreamSource)?.[1] ?? ''
+  const fillerCount = (fillerBlock.match(/^\s*"/gmu) ?? []).length
+  const highestIndex = Math.max(...module.START_FILLERS, ...module.WORK_FILLERS)
+  check('номера подводок не выходят за список в голосовом процессе',
+    fillerCount > highestIndex,
+    `в списке ${String(fillerCount)} фраз, старший номер ${String(highestIndex)}`)
+  check('наборы подводок не пустые и не пересекаются',
+    module.START_FILLERS.length >= 5 && module.WORK_FILLERS.length >= 4
+    && module.START_FILLERS.every((one) => !module.WORK_FILLERS.includes(one)),
+    `начало ${String(module.START_FILLERS.length)}, работа ${String(module.WORK_FILLERS.length)}`)
+
+  const bagVoice = new module.VoiceStream(tickConfig, () => {})
+  const bagSent = []
+  bagVoice.child = { stdin: { writable: true, write: (line) => bagSent.push(JSON.parse(line).which) } }
+  for (let step = 0; step < 30; step += 1) bagVoice.takeFiller(module.START_FILLERS)
+  const backToBack = bagSent.filter((value, index) => index > 0 && value === bagSent[index - 1]).length
+  const distinctFillers = new Set(bagSent).size
+  check('подводки идут без повторов подряд и покрывают весь набор',
+    backToBack === 0 && distinctFillers === module.START_FILLERS.length
+    && bagSent.every((value) => module.START_FILLERS.includes(value)),
+    `повторов подряд ${String(backToBack)}, разных ${String(distinctFillers)} `
+    + `из ${String(module.START_FILLERS.length)}`)
+
   // --- 5. браузерная половина --------------------------------------------------
   let bundle = null
   globalThis.window = { __ModuleLoader__: { load: (definition) => { bundle = definition } } }
