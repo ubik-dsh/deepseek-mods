@@ -22,7 +22,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import queue
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -39,6 +42,74 @@ import speak as voice  # noqa: E402 — голос, очистка текста 
 import числа  # noqa: E402 — цифры и латиница словами: silero их не произносит
 
 
+def choose_player(system: str | None = None, find=shutil.which) -> dict:
+    """Чем играть звук на этой платформе.
+
+    ПОЧЕМУ ЭТО ОТДЕЛЬНАЯ ФУНКЦИЯ. Синтез кроссплатформенный (`torch` и `numpy` есть везде), а
+    платформенным было только воспроизведение: `winsound` существует лишь на Windows, и на Linux
+    импорт падал в общий `except` — падения не было, но и звука тоже: функция МОЛЧА не работала.
+    Здесь выбор делается один раз при запуске, пишется в журнал, а если играть нечем — человек
+    получает не тишину, а подсказку, что поставить.
+
+    :param system: имя платформы (`platform.system()`); параметр нужен, чтобы проверять выбор
+        запуском на любой машине, а не только на своей.
+    :param find: чем искать команду в PATH; подменяется в проверке.
+    :returns словарь с `kind` и либо готовой командой, либо подсказкой.
+    """
+    name = (system or platform.system()).lower()
+    if name.startswith("win"):
+        return {"kind": "winsound", "command": None, "args": [],
+                "why": "Windows: winsound, внешних программ не нужно"}
+    if name == "darwin":
+        if find("afplay") is not None:
+            return {"kind": "afplay", "command": find("afplay"), "args": [],
+                    "why": "macOS: afplay"}
+        return {"kind": "none", "command": None, "args": [],
+                "why": "macOS: не найден afplay", "hint": "afplay входит в macOS; проверьте PATH"}
+    # Linux и прочие: первый найденный из списка. Порядок от самого лёгкого к самому общему.
+    candidates = [
+        ("aplay", ["-q"], "alsa-utils"),
+        ("paplay", [], "pulseaudio-utils"),
+        ("ffplay", ["-nodisp", "-autoexit", "-loglevel", "quiet"], "ffmpeg"),
+        ("mpv", ["--really-quiet", "--no-video"], "mpv"),
+    ]
+    for command, extra, package in candidates:
+        found = find(command)
+        if found is not None:
+            return {"kind": command, "command": found, "args": extra,
+                    "why": f"Linux: {command}"}
+    return {"kind": "none", "command": None, "args": [],
+            "why": "Linux: не найдено ни aplay, ни paplay, ни ffplay, ни mpv",
+            "hint": "поставьте alsa-utils (aplay) или pulseaudio-utils (paplay)"}
+
+
+def play(path: Path, player: dict) -> tuple[bool, str | None]:
+    """Проиграть файл выбранным способом.
+
+    :returns (сыграли ли, текст ошибки или None).
+    """
+    if player["kind"] == "none":
+        return False, player.get("hint") or player.get("why")
+    if player["kind"] == "winsound":
+        try:
+            import winsound  # noqa: PLC0415 — только Windows, поэтому импорт внутри ветки
+            winsound.PlaySound(str(path), winsound.SND_FILENAME)
+            return True, None
+        except Exception as error:  # noqa: BLE001
+            return False, f"{type(error).__name__} {error}"
+    try:
+        subprocess.run([player["command"], *player["args"], str(path)],
+                       check=True, capture_output=True, timeout=600)
+        return True, None
+    except Exception as error:  # noqa: BLE001
+        return False, f"{type(error).__name__} {error}"
+
+
+# ВЫБРАННЫЙ ПРОИГРЫВАТЕЛЬ. Определяется один раз при запуске процесса: искать в PATH на каждый
+# кусок незачем, а главное — выбор должен быть виден в журнале, чтобы «тишина» объяснялась.
+PLAYER = choose_player()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Потоковая озвучка кусками")
     parser.add_argument("--staging", type=int, default=3,
@@ -46,6 +117,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-total", type=int, default=6000,
                         help="предохранитель на ОДИН ответ, знаков после очистки; "
                              "планировщик на той стороне режет ответ сам")
+    parser.add_argument("--selftest", action="store_true",
+                        help="проверить выбор проигрывателя для всех платформ и выйти")
     return parser.parse_args()
 
 
@@ -75,6 +148,54 @@ FILLERS = [
 
 def filler_path(index: int) -> Path:
     return FILLER_DIR / f"{index:02d}.wav"
+
+
+def selftest() -> int:
+    """Проверить выбор проигрывателя для всех платформ — на любой машине.
+
+    Платформенную ветку нельзя проверить «своим» запуском: на Windows нет Linux, а на Linux нет
+    `winsound`. Поэтому выбор вынесен в чистую функцию с подменяемым поиском в PATH, и здесь мы
+    прогоняем все три платформы, включая случай «играть нечем»: он обязан дать подсказку, а не
+    пустоту, иначе человек снова получит тишину без объяснений.
+    """
+    checks: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append((name, ok, detail))
+
+    def finder(*available: str):
+        return lambda command: f"/usr/bin/{command}" if command in available else None
+
+    windows = choose_player("Windows", finder())
+    check("Windows: winsound, без внешних программ",
+          windows["kind"] == "winsound" and windows["command"] is None, windows["why"])
+    mac = choose_player("Darwin", finder("afplay"))
+    check("macOS: afplay", mac["kind"] == "afplay" and mac["command"].endswith("afplay"), mac["why"])
+    linux_aplay = choose_player("Linux", finder("aplay"))
+    check("Linux: первый найденный это aplay", linux_aplay["kind"] == "aplay", linux_aplay["why"])
+    check("Linux: aplay с тихим ключом", linux_aplay["args"] == ["-q"], str(linux_aplay["args"]))
+    linux_paplay = choose_player("Linux", finder("paplay", "mpv"))
+    check("Linux: если aplay нет, берём paplay", linux_paplay["kind"] == "paplay", linux_paplay["why"])
+    linux_ffplay = choose_player("Linux", finder("ffplay"))
+    check("Linux: если нет ничего кроме ffplay, берём его", linux_ffplay["kind"] == "ffplay",
+          linux_ffplay["why"])
+    linux_mpv = choose_player("Linux", finder("mpv"))
+    check("Linux: mpv последним", linux_mpv["kind"] == "mpv", linux_mpv["why"])
+    nothing = choose_player("Linux", finder())
+    check("Linux без проигрывателей: отказ с подсказкой",
+          nothing["kind"] == "none" and "alsa-utils" in nothing.get("hint", ""),
+          f"{nothing['why']} / {nothing.get('hint', '')}")
+    played, why = play(Path("нет-такого-файла.wav"), nothing)
+    check("Играть нечем: play отвечает отказом и причиной",
+          played is False and why is not None, str(why))
+
+    failures = 0
+    for name, ok, detail in checks:
+        print(f"{'ПРОШЛО' if ok else 'ПРОВАЛ'}  {name}" + (f" — {detail}" if detail else ""))
+        if not ok:
+            failures += 1
+    print(f"\nпроверок: {len(checks)}, провалов: {failures}")
+    return 0 if failures == 0 else 1
 
 
 def prepare_fillers() -> None:
@@ -167,12 +288,9 @@ def player() -> None:
             # выключить голос кнопкой в панели, и тогда молчит даже готовое.
             log("голос ВЫКЛ — проигрывать не буду")
         elif path is not None:
-            try:
-                import winsound
-                winsound.PlaySound(str(path), winsound.SND_FILENAME)
-                played = True
-            except Exception as error:  # noqa: BLE001
-                log(f"проиграть кусок {identifier} не удалось: {type(error).__name__} {error}")
+            played, why = play(Path(path), PLAYER)
+            if not played:
+                log(f"проиграть кусок {identifier} не удалось: {why}")
         if not played and path is not None and not Path(path).exists():
             log(f"файл куска {identifier} не создан — читать нечего")
         reply = {"id": identifier, "spoken": len(text), "synthSeconds": item.get("synth", 0.0),
@@ -188,6 +306,13 @@ def player() -> None:
 
 def main() -> int:
     log(f"потоковая озвучка готова: движок {voice.ENGINE}, голос включён: {voice.voice_on()}")
+    # ЧЕМ ИГРАЕМ И ЧЕМ НЕ ИГРАЕМ. Если проигрывателя нет, человек должен узнать это из журнала
+    # сразу, а не гадать, почему ответы читаются молча.
+    log(f"проигрыватель: {PLAYER['why']}")
+    if PLAYER["kind"] == "none":
+        log(f"звука не будет: {PLAYER['why']}. {PLAYER.get('hint', '')}".strip())
+    if ARGS.selftest:
+        return selftest()
     # ПРОГРЕВ. Загрузка модели голоса стоит около девяти секунд; платить их на первом
     # ответе незачем, поэтому грузим её сразу при запуске, а синтезированную пробу
     # выбрасываем, не проигрывая: она нужна только чтобы модель встала в память.
